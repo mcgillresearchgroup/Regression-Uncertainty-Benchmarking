@@ -1,0 +1,16 @@
+name: Benchmarking
+channels:
+  - conda-forge
+  - defaults
+  - pytorch
+dependencies:
+  - numpy
+  - pytorch
+  - pip
+  - matplotlib
+  - scikit-learn
+  - scipy
+  - pandas
+  - pip:
+    - skorch
+    - ucimlrepo
