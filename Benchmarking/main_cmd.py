@@ -1,4 +1,4 @@
-""""""
+"""Main file to run the complete workflow: hyperparameter optimization (optional), training, and plotting for all model combinations."""
 import subprocess
 import sys
 import argparse
