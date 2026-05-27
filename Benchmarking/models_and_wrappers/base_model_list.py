@@ -45,15 +45,14 @@ class MVE_Default(BaseModel):
     def module_sequence_head(self):
         self.mean_head = nn.Linear(self.size_in, self.num_targets)
         self.var_head = nn.Linear(self.size_in, self.num_targets)
-        self.softplus = nn.Softplus()
 
     def forward(self, x):
         for layer in self.module_sequence_body_list:
             x = layer(x)
         mean = self.mean_head(x)
-        raw_var = self.var_head(x)
-        var = self.softplus(raw_var)
+        var = self.var_head(x)
         return mean, var
+    
     
 class MVE_Mean_Head_Extension(BaseModel):
     def __init__(self, n_layers, layer_size, num_features, num_targets, dropout=0.0, mean_head_dropout=0.0, mean_head_n_layers=2, mean_head_layer_size=None):
@@ -73,11 +72,6 @@ class MVE_Mean_Head_Extension(BaseModel):
             self.module_sequence_head_list.append(nn.ReLU())
             self.module_sequence_head_list.append(nn.Dropout(self.mean_head_dropout))
             self.size_in = self.mean_head_layer_size
-
-        # Final mean and variance head transforms
-        self.mean_head = nn.Linear(self.size_in, self.num_targets)
-        self.var_head = nn.Linear(self.size_in, self.num_targets)
-        self.softplus = nn.Softplus()
         
     def forward(self, x):
         for layer in self.module_sequence_body_list:
@@ -86,8 +80,7 @@ class MVE_Mean_Head_Extension(BaseModel):
         for layer in self.module_sequence_head_list:
             mean = layer(mean)
         mean = self.mean_head(mean)
-        raw_var = self.var_head(x)
-        var = self.softplus(raw_var)
+        var = self.var_head(x)
         return mean, var
         
 class MLP_Default(BaseModel):
