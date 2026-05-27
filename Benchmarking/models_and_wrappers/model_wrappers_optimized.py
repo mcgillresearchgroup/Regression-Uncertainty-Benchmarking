@@ -100,7 +100,7 @@ class Base_Model_Wrapper(ABC):
     # Main training section of fit function.
     def training(self, X_tensor, y_tensor):
         """Train models with optional mini-batch support.
-        If there is no variance, it will use MSE loss. If there is variance, it will use GaussianNLLLoss.
+        If there is no log(variance), it will use MSE loss. If there is log(variance), it will use GaussianNLLLoss.
         Inputs:
             X_tensor: Scaled input features as a PyTorch tensor
             y_tensor: Scaled target values as a PyTorch tensor
@@ -128,7 +128,8 @@ class Base_Model_Wrapper(ABC):
                     output = model(X_batch)
                     
                     if self.output_variance:
-                        mean_pred, var_pred = output
+                        mean_pred, log_var_pred = output
+                        var_pred = torch.exp(log_var_pred)
                         loss = criterion(mean_pred.flatten(), y_batch.flatten(), var_pred.flatten())
                     else:
                         mean_pred = output
@@ -175,7 +176,8 @@ class MVE_Ensemble_Averaged(Base_Model_Wrapper):
             model = model.to(self.device)
             X_batch = X_tensor.to(self.device)
             with torch.no_grad():
-                mean, var = model(X_batch)
+                mean, log_var = model(X_batch)
+                var = torch.exp(log_var)
                 preds_mean_list.append(mean.cpu().numpy())
                 preds_var_list.append(var.cpu().numpy())
             model.cpu()
@@ -190,11 +192,11 @@ class MVE_Ensemble_Averaged(Base_Model_Wrapper):
         
         # Reshape for inverse_transform
         preds_mean_reshaped = preds_mean.reshape(-1, n_targets)
-        preds_var_reshaped = preds_var.reshape(-1, n_targets)
+        preds_log_var_reshaped = preds_var.reshape(-1, n_targets)
         
         # Inverse transform
         preds_mean_unscaled = self.y_scaler.inverse_transform(preds_mean_reshaped)
-        preds_var_unscaled = preds_var_reshaped * (self.y_scaler.scale_ ** 2)
+        preds_var_unscaled = torch.exp(preds_log_var_reshaped) * (self.y_scaler.scale_ ** 2)
         
         # Reshape back
         preds_mean_unscaled = preds_mean_unscaled.reshape(n_models, n_samples, n_targets)
@@ -281,7 +283,8 @@ class MVE_Ensemble_Multiplicative(MVE_Ensemble_Averaged):
             model = model.to(self.device)
             X_batch = X_tensor.to(self.device)
             with torch.no_grad():
-                mean, var = model(X_batch)
+                mean, log_var = model(X_batch)
+                var = torch.exp(log_var)
                 preds_mean_list.append(mean.cpu().numpy())
                 preds_var_list.append(var.cpu().numpy())
             model.cpu()
@@ -306,10 +309,10 @@ class MVE_Ensemble_Multiplicative(MVE_Ensemble_Averaged):
         preds_mean_unscaled = preds_mean_unscaled.reshape(n_models, n_samples, n_targets)
         preds_var_unscaled = preds_var_unscaled.reshape(n_models, n_samples, n_targets)
         
-        # Ensemble aggregation with geometric mean
+        # Ensemble aggregation using geometric mean
         mean_ensemble = np.prod(preds_mean_unscaled, axis=0) ** (1 / self.n_models)
         aleatoric_var = preds_var_unscaled.mean(axis=0)
-        epistemic_var = np.var(preds_mean_unscaled, axis=0)
+        epistemic_var = np.mean((preds_mean_unscaled - mean_ensemble) ** 2, axis=0)
         var_ensemble = aleatoric_var + epistemic_var
 
         return mean_ensemble, var_ensemble
