@@ -132,9 +132,11 @@ print("Saved: model_comparison.png")
 
 # Create prediction vs ground truth plots
 n_results = len(results_data)
-n_cols = min(3, n_results)
-n_rows = (n_results + n_cols - 1) // n_cols
-fig, axes = plt.subplots(n_rows, n_cols, figsize=(5*n_cols, 5*n_rows))
+if n_results == 0:
+    print("No results found to plot. Exiting.")
+    exit(0)
+n_rows = (n_results + n_results - 1) // n_results
+fig, axes = plt.subplots(n_rows, n_results, figsize=(5*n_results, 5*n_rows))
 axes_flat = axes.flatten() if isinstance(axes, np.ndarray) else [axes]
 
 fig.suptitle('Actual vs Predicted - Concrete Compressive Strength', fontsize=14, fontweight='bold')

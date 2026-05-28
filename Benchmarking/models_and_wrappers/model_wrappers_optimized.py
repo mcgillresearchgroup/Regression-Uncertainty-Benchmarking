@@ -192,11 +192,11 @@ class MVE_Ensemble_Averaged(Base_Model_Wrapper):
         
         # Reshape for inverse_transform
         preds_mean_reshaped = preds_mean.reshape(-1, n_targets)
-        preds_log_var_reshaped = preds_var.reshape(-1, n_targets)
+        preds_var_reshaped = preds_var.reshape(-1, n_targets)
         
         # Inverse transform
         preds_mean_unscaled = self.y_scaler.inverse_transform(preds_mean_reshaped)
-        preds_var_unscaled = torch.exp(preds_log_var_reshaped) * (self.y_scaler.scale_ ** 2)
+        preds_var_unscaled = np.exp(preds_var_reshaped) * (self.y_scaler.scale_ ** 2)
         
         # Reshape back
         preds_mean_unscaled = preds_mean_unscaled.reshape(n_models, n_samples, n_targets)
