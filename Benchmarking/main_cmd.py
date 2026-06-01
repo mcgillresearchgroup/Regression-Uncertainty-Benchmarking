@@ -6,6 +6,9 @@ import argparse
 # Model combinations to test: (wrapper, model)
 MODEL_COMBINATIONS = [
     ("MVE_Ensemble_Averaged", "MVE_Default"),  # MEA-MD
+    ("MVE_Ensemble_Averaged", "MVE_Mean_Head_Extension"),  # MEA-MH
+    ("MVE_Ensemble_Multiplicative", "MVE_Default"),  # MEM-MD
+    ("MVE_Ensemble_Multiplicative", "MVE_Mean_Head_Extension"),  # MEM-MH
 ]
 
 DATASET = "Concrete Compressive Strength"
@@ -23,8 +26,8 @@ def parse_args():
     )
     parser.add_argument(
         '--use-best',
-        action='store_true',
-        help='Use best parameters from previous optimization instead of running optimization'
+        type=str,
+        help='Use best hyperparameters from optimization. Provide path to JSON config file (e.g. results/best_parameters.json). If not specified, runs optimization for each combination.'
     )
     return parser.parse_args()
 
@@ -43,7 +46,7 @@ def run_training(combinations_to_run=None, use_best=False):
         print("-" * 80)
         
         cmd = [
-            sys.executable, "train_redo.py",
+            sys.executable, "train.py",
             "-d", DATASET,
             "-m", model,
             "-w", wrapper
