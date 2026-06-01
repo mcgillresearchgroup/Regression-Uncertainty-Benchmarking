@@ -294,7 +294,7 @@ class MVE_Ensemble_Multiplicative(MVE_Ensemble_Averaged):
         preds_var = np.stack(preds_var_list, axis=0)
         del preds_mean_list, preds_var_list
         gc.collect()
-        
+    
         n_models, n_samples, n_targets = preds_mean.shape
         
         # Reshape for inverse_transform
@@ -309,17 +309,18 @@ class MVE_Ensemble_Multiplicative(MVE_Ensemble_Averaged):
         preds_mean_unscaled = preds_mean_unscaled.reshape(n_models, n_samples, n_targets)
         preds_var_unscaled = preds_var_unscaled.reshape(n_models, n_samples, n_targets)
         
-<<<<<<< HEAD
-        
-=======
-        # Ensemble aggregation using geometric mean
-        mean_ensemble = np.prod(preds_mean_unscaled, axis=0) ** (1 / self.n_models)
-        aleatoric_var = preds_var_unscaled.mean(axis=0)
-        epistemic_var = np.mean((preds_mean_unscaled - mean_ensemble) ** 2, axis=0)
-        var_ensemble = aleatoric_var + epistemic_var
->>>>>>> origin/Testing_and_Profiling
+        for i in range(n_models - 1):
+            if i == 0:
+                mean_1 = preds_mean_unscaled[i]
+                var_1 = preds_var_unscaled[i]
+            mean_2 = preds_mean_unscaled[(i + 1)]
+            var_2 = preds_var_unscaled[(i + 1)]
+            multiplicative_mean = ((mean_1 * var_2**2) + (mean_2 * var_1**2)) / (var_1**2 + var_2**2)
+            multiplicative_var = 1 / ((1 / (var_1 **2)) + (1 / (var_2 **2)))
+            mean_1 = multiplicative_mean
+            var_1 = multiplicative_var
 
-        return mean_ensemble, var_ensemble
+        return multiplicative_mean, multiplicative_var
 
 # Dictionary of model wrappers. The boolean indicates whether the wrapper requires variance output from the base model.
 wrapper_list_dict = {
