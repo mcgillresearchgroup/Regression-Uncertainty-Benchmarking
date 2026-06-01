@@ -26,6 +26,7 @@ def parse_args():
     )
     parser.add_argument(
         '--use-best',
+        action='store_true',
         type=str,
         help='Use best hyperparameters from optimization. Provide path to JSON config file (e.g. results/best_parameters.json). If not specified, runs optimization for each combination.'
     )
