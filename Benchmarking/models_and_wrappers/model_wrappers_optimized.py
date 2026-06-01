@@ -309,11 +309,7 @@ class MVE_Ensemble_Multiplicative(MVE_Ensemble_Averaged):
         preds_mean_unscaled = preds_mean_unscaled.reshape(n_models, n_samples, n_targets)
         preds_var_unscaled = preds_var_unscaled.reshape(n_models, n_samples, n_targets)
         
-        # Ensemble aggregation using geometric mean
-        mean_ensemble = np.prod(preds_mean_unscaled, axis=0) ** (1 / self.n_models)
-        aleatoric_var = preds_var_unscaled.mean(axis=0)
-        epistemic_var = np.mean((preds_mean_unscaled - mean_ensemble) ** 2, axis=0)
-        var_ensemble = aleatoric_var + epistemic_var
+        
 
         return mean_ensemble, var_ensemble
 
