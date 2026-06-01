@@ -81,8 +81,10 @@ Examples:
     )
     mode_group.add_argument(
         '--use-best',
-        action='store_true',
-        help='Use best parameters from previous optimization runs (if available)'
+        nargs='?',
+        const=None,
+        type=str,
+        help='Use best parameters from previous optimization runs. Optionally specify a custom file path.'
     )
     
     # Hyperparameters (used when not using --optimize or --use-best)
@@ -277,14 +279,14 @@ def main():
             print(f"Train/Test split: {len(X_train)} / {len(X_test)}\n")
         
         # Run hyperparameter optimization with pre-split data
-        best_params, _, _ = run_hyperparameter_optimization(
+        best_params, best_nll, _ = run_hyperparameter_optimization(
             X_train, y_train, X_test, y_test, wrapper_class, args.model, 
             num_features, num_targets,
-            n_trials=args.n_trials, verbose=args.verbose, batch_size=32
+            n_trials=args.n_trials, verbose=args.verbose, batch_size=128, use_kfold=True, n_splits=10
         )
         
         # Save best parameters
-        save_best_parameters(best_params, args.dataset, args.wrapper, args.model)
+        save_best_parameters(best_params, args.dataset, args.wrapper, args.model, best_nll=best_nll)
         
         hp = {
             'lr': best_params['lr'],
@@ -294,59 +296,29 @@ def main():
             'dropout': best_params['dropout'],
             'mean_head_dropout': best_params['mean_head_dropout'],
             'n_models': best_params.get('n_models', 5)
-            #batch size hp to be added
+            #batch size hp to be added (Currently defaulting to 128)
         }
         
         hp_source = "Optuna optimization (optimized)"
     elif args.use_best:
         # Try to load best parameters
-        best_params = load_best_parameters(args.dataset, args.wrapper, args.model)
+        best_params = load_best_parameters(args.dataset, args.wrapper, args.model, file_path = args.use_best)
+        params = best_params.get('parameters', best_params)
         
-        if best_params is None:
-            if args.verbose:
-                print(f"No best parameters found for {args.dataset} + {args.wrapper} + {args.model}")
-                print(f"Falling back to provided/default hyperparameters\n")
-            
-            # Fall back to provided parameters
-            best_params = None
-            # Use provided parameters
-            hp = {
-                'lr': args.lr,
-                'epochs': args.epochs,
-                'n_layers': args.n_layers,
-                'layer_size': args.layer_size,
-                'dropout': args.dropout,
-                'mean_head_dropout': args.mean_head_dropout,
-                'n_models': args.n_models
-            }
-            hp_source = "provided"
-        else:
-            if args.verbose:
-                print(f"Loaded best parameters from previous optimization\n")
-            
-            # Extract parameters from nested structure
-            params = best_params.get('parameters', best_params)
-            
-            hp = {
-                'lr': float(params['lr']),
-                'epochs': int(params['epochs']),
-                'n_layers': int(params['n_layers']),
-                'layer_size': int(params['layer_size']),
-                'dropout': float(params['dropout']),
-                'mean_head_dropout': float(params['mean_head_dropout']),
-                'n_models': int(params.get('n_models', 5))
-            }
-            hp_source = "best parameters"
-            
-    else:
-        # Use provided parameters
-        X_train, X_test, y_train, y_test = train_test_split(
-            X, y, train_size=args.train_size, random_state=args.seed
-        )
-        
+        hp = {
+            'lr': args.lr if args.lr != None else float(params['lr']),
+            'epochs': args.epochs if args.epochs != None else int(params['epochs']),
+            'n_layers': args.n_layers if args.n_layers != None else int(params['n_layers']),
+            'layer_size': args.layer_size if args.layer_size != None else int(params['layer_size']),
+            'dropout': args.dropout if args.dropout != None else float(params['dropout']),
+            'mean_head_dropout': args.mean_head_dropout if args.mean_head_dropout != None else float(params['mean_head_dropout']),
+            'n_models': args.n_models if args.n_models != None else int(params.get('n_models', 5))
+        }
+        hp_source = "best parameters (merged with user-specified values)"
+
+    elif best_params is None:
         if args.verbose:
-            print(f"Train/Test split: {len(X_train)} / {len(X_test)}\n")
-        
+            print(f'Using default parameters')
         hp = {
             'lr': args.lr,
             'epochs': args.epochs,
@@ -354,9 +326,9 @@ def main():
             'layer_size': args.layer_size,
             'dropout': args.dropout,
             'mean_head_dropout': args.mean_head_dropout,
-            'n_models': args.n_models
-        }
-        hp_source = "provided"
+            'n_models': args.n_models 
+        } 
+        hp_source = "default parameters"
     
     # Split data if not already done (in optimize mode it's already split)
     if not args.optimize:

@@ -26,7 +26,7 @@ def parse_args():
     )
     parser.add_argument(
         '--use-best',
-        action='store_true',
+        const=None,
         type=str,
         help='Use best hyperparameters from optimization. Provide path to JSON config file (e.g. results/best_parameters.json). If not specified, runs optimization for each combination.'
     )
@@ -53,8 +53,8 @@ def run_training(combinations_to_run=None, use_best=False):
             "-w", wrapper
         ]
         
-        if use_best:
-            cmd.append("--use-best")
+        if use_best is not None:
+            cmd.extend(["--use-best", use_best])
         else:
             cmd.append("--optimize")
         
@@ -62,9 +62,9 @@ def run_training(combinations_to_run=None, use_best=False):
             result = subprocess.run(cmd, check=True)
             if result.returncode != 0:
                 print(f"Warning: Training command returned non-zero exit code: {result.returncode}")
-        except subprocess.CalledProcessError as e:
+        except subprocess.CalledProcessError as error:
             print(f"Error: Training failed for {wrapper} + {model}")
-            print(f"Exit code: {e.returncode}")
+            print(f"Exit code: {error.returncode}")
             return False
     
     return True

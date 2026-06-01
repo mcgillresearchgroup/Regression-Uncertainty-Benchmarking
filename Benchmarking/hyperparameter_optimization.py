@@ -33,12 +33,12 @@ def create_model_wrapper(wrapper_class, base_model, num_features, num_targets, l
 
 
 def create_objective(X_train, y_train, X_test, y_test, wrapper_class, base_model, 
-                    num_features, num_targets, verbose=False, batch_size=128, use_kfold=False, n_splits=5):
+                    num_features, num_targets, verbose=False, batch_size=128, use_kfold=True, n_splits=10):
     """Create an Optuna objective function.
     
     Args:
-        use_kfold: If True, use k-fold cross-validation on X_train/y_train instead of X_test/y_test
-        n_splits: Number of folds for cross-validation (default: 5)
+        use_kfold: If True, use k-fold cross-validation on X_train/y_train instead of X_test/y_test (default: True)
+        n_splits: Number of folds for cross-validation (default: 10)
     """
     def objective(trial):
         # Suggest hyperparameters
