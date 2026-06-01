@@ -27,17 +27,18 @@
 
 
 
-<!-- PROJECT LOGO -->
+<!-- PROJECT LOGO 
 <br />
 <div align="center">
   <a href="https://github.com/mcgillresearchgroup/Regression-Uncertainty-Benchmarking">
     <img src="images/logo.png" alt="Logo" width="80" height="80">
   </a>
-
+-->
 <h3 align="center">Regression Uncertainty Benchmarking</h3>
 
   <p align="center">
     This project is used for benchmark testing different machine learning uncertainty based regression model architectures and methods.
+    <!--
     <br />
     <a href="https://github.com/mcgillresearchgroup/Regression-Uncertainty-Benchmarking"><strong>Explore the docs »</strong></a>
     <br />
@@ -47,6 +48,7 @@
     <a href="https://github.com/mcgillresearchgroup/Regression-Uncertainty-Benchmarking/issues/new?labels=bug&template=bug-report---.md">Report Bug</a>
     &middot;
     <a href="https://github.com/mcgillresearchgroup/Regression-Uncertainty-Benchmarking/issues/new?labels=enhancement&template=feature-request---.md">Request Feature</a>
+    -->
   </p>
 </div>
 
@@ -84,7 +86,6 @@
 ## About The Project
 <!--
 *** [![Product Name Screen Shot][product-screenshot]](https://example.com)
--->
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
@@ -102,7 +103,7 @@
 * [![JQuery][JQuery.com]][JQuery-url]
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
-
+-->
 
 
 <!-- GETTING STARTED -->
@@ -110,7 +111,7 @@
 
 This is an example of how you may give instructions on setting up your project locally.
 To get a local copy up and running follow these simple example steps.
-
+<!--
 ### Prerequisites
 
 This is an example of how to list things you need to use the software and how to install them.
@@ -141,10 +142,10 @@ This is an example of how to list things you need to use the software and how to
    ```
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
+-->
 
 
-
-<!-- USAGE EXAMPLES -->
+<!-- USAGE EXAMPLES 
 ## Usage
 
 Use this space to show useful examples of how a project can be used. Additional screenshots, code examples and demos work well in this space. You may also link to more resources.
@@ -152,16 +153,16 @@ Use this space to show useful examples of how a project can be used. Additional 
 _For more examples, please refer to the [Documentation](https://example.com)_
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
-
+-->
 
 
 <!-- ROADMAP -->
 ## Roadmap
 
-- [ ] Feature 1
-- [ ] Feature 2
-- [ ] Feature 3
-    - [ ] Nested Feature
+- [ ] Addition of Gaussian Process Model
+- [ ] Switching variance prediction to be a log(var) prediction
+- [ ] Slurm compatibility
+    - [ ] Optional model testing submission methods
 
 See the [open issues](https://github.com/mcgillresearchgroup/Regression-Uncertainty-Benchmarking/issues) for a full list of proposed features (and known issues).
 
@@ -169,7 +170,7 @@ See the [open issues](https://github.com/mcgillresearchgroup/Regression-Uncertai
 
 
 
-<!-- CONTRIBUTING -->
+<!-- CONTRIBUTING 
 ## Contributing
 
 Contributions are what make the open source community such an amazing place to learn, inspire, and create. Any contributions you make are **greatly appreciated**.
@@ -190,22 +191,22 @@ Don't forget to give the project a star! Thanks again!
 <a href="https://github.com/mcgillresearchgroup/Regression-Uncertainty-Benchmarking/graphs/contributors">
   <img src="https://contrib.rocks/image?repo=mcgillresearchgroup/Regression-Uncertainty-Benchmarking" alt="contrib.rocks image" />
 </a>
+-->
 
 
-
-<!-- LICENSE -->
+<!-- LICENSE 
 ## License
 
 Distributed under the project_license. See `LICENSE.txt` for more information.
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
-
+-->
 
 
 <!-- CONTACT -->
 ## Contact
 
-Rajan Frattare - frattarer@vcu.com
+Rajan Frattare - frattarer@vcu.edu
 
 Project Link: [https://github.com/mcgillresearchgroup/Regression-Uncertainty-Benchmarking](https://github.com/mcgillresearchgroup/Regression-Uncertainty-Benchmarking)
 
@@ -213,7 +214,7 @@ Project Link: [https://github.com/mcgillresearchgroup/Regression-Uncertainty-Ben
 
 
 
-<!-- ACKNOWLEDGMENTS -->
+<!-- ACKNOWLEDGMENTS 
 ## Acknowledgments
 
 * []()
@@ -221,7 +222,7 @@ Project Link: [https://github.com/mcgillresearchgroup/Regression-Uncertainty-Ben
 * []()
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
-
+-->
 
 
 <!-- MARKDOWN LINKS & IMAGES -->
