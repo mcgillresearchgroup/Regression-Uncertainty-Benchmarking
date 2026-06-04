@@ -1,16 +1,12 @@
-"""Model naming utilities for consistent labeling across the project."""
+import json
+import numpy as np
+import matplotlib.pyplot as plt
+from pathlib import Path
+from sklearn.metrics import mean_squared_error
 
 
 def get_model_label(wrapper, model):
-    """Convert wrapper and model names to clean abbreviated labels.
-    
-    Args:
-        wrapper: Wrapper name (e.g., 'MVE_Ensemble_Averaged')
-        model: Model name (e.g., 'MVE_Default')
-    
-    Returns:
-        Clean abbreviated label (e.g., 'MEA-MD')
-    """
+    """Convert wrapper and model names to clean abbreviated labels."""
     wrapper_map = {
         'MVE_Ensemble': 'MEA',  # Legacy name
         'MVE_Ensemble_Averaged': 'MEA',
@@ -18,8 +14,8 @@ def get_model_label(wrapper, model):
         'MLP_Ensemble': 'MLP',
     }
     model_map = {
-        'MVE_Default': 'MD',
-        'MVE_Mean_Head_Extension': 'MMH',
+        'MVE_Default': 'D',
+        'MVE_Mean_Head_Extension': 'MH',
         'MLP_Default': 'MLP',
     }
     
@@ -27,3 +23,9 @@ def get_model_label(wrapper, model):
     model_label = model_map.get(model, model)
     
     return f"{wrapper_label}-{model_label}"
+
+
+# Load results
+results_dir = Path('.././best_params_and_all_results')
+result_files = sorted(results_dir.glob('*.json'))
+

@@ -9,9 +9,8 @@ from pathlib import Path
 import gc
 import sys
 from sklearn.model_selection import KFold
-
-from models_and_wrappers.model_wrappers_optimized import MVE_Single
-from custom_metrics import negative_log_likelihood
+from Benchmarking.models_and_wrappers.model_wrappers import MVE_Single
+from utils import negative_log_likelihood
 
 
 def create_model_wrapper(wrapper_class, base_model, num_features, num_targets, lr, epochs, 

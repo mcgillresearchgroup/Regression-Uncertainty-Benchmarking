@@ -1,6 +1,5 @@
 """Main training script with command-line interface for model training and hyperparameter selection."""
 
-import argparse
 import sys
 import numpy as np
 import json
@@ -8,165 +7,21 @@ import pandas as pd
 from pathlib import Path
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
-
-from data_dictionaries import load_dataset, data_pull_dict
-from models_and_wrappers.base_model_list import base_model_list_dict
-from models_and_wrappers.model_wrappers_optimized import wrapper_list_dict
-from custom_metrics import negative_log_likelihood
-from model_naming import get_model_label
+from utils import (
+    parse_args, 
+    load_dataset, 
+    save_results, 
+    print_metrics, 
+    negative_log_likelihood, 
+    get_model_label,
+    wrapper_list_dict
+)
 from hyperparameter_optimization import (
     create_model_wrapper, 
     run_hyperparameter_optimization,
     load_best_parameters,
     save_best_parameters
 )
-
-
-# Available options
-DATASETS = list(data_pull_dict.keys())
-MODELS = list(base_model_list_dict.keys())
-WRAPPERS = list(wrapper_list_dict.keys())
-
-
-def parse_args():
-    """Parse command line arguments."""
-    parser = argparse.ArgumentParser(
-        description='Train and evaluate regression models with uncertainty quantification',
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog="""
-Examples:
-  # Use individual hyperparameters
-  python train.py --dataset "Wine_Quality" --model "MVE_Default" --wrapper "MVE_Single" --epochs 50 --n-models 3
-  
-  # Use best parameters from previous runs
-  python train.py --dataset "Concrete Compressive Strength" --model "MLP_Default" --wrapper "MLP_Ensemble" --use-best
-  
-  # Run hyperparameter optimization with default 30 trials (optimized)
-  python train.py -d "Wine_Quality" -m "MVE_Default" -w "MVE_Ensemble_Averaged" --optimize
-  
-  # Run hyperparameter optimization with custom number of trials
-  python train.py -d "Wine_Quality" -m "MVE_Default" -w "MVE_Single" --optimize --n-trials 50
-        """)
-    
-    parser.add_argument(
-        '-d', '--dataset',
-        type=str,
-        required=True,
-        choices=DATASETS,
-        help=f'Dataset to use. Options: {", ".join(DATASETS)}'
-    )
-    
-    parser.add_argument(
-        '-m', '--model',
-        type=str,
-        required=True,
-        choices=MODELS,
-        help=f'Base model architecture. Options: {", ".join(MODELS)}'
-    )
-    
-    parser.add_argument(
-        '-w', '--wrapper',
-        type=str,
-        required=True,
-        choices=WRAPPERS,
-        help=f'Model wrapper for training. Options: {", ".join(WRAPPERS)}'
-    )
-    
-    # Hyperparameter selection mode
-    mode_group = parser.add_mutually_exclusive_group()
-    mode_group.add_argument(
-        '--optimize',
-        action='store_true',
-        help='Run hyperparameter optimization with Optuna'
-    )
-    mode_group.add_argument(
-        '--use-best',
-        nargs='?',
-        const=None,
-        type=str,
-        help='Use best parameters from previous optimization runs. Optionally specify a custom file path.'
-    )
-    
-    # Hyperparameters (used when not using --optimize or --use-best)
-    parser.add_argument(
-        '--epochs',
-        type=int,
-        default=100,
-        help='Number of training epochs (default: 100)'
-    )
-    
-    parser.add_argument(
-        '--n-models',
-        type=int,
-        default=5,
-        help='Number of models for ensemble (default: 5, ignored for MVE_Single)'
-    )
-    
-    parser.add_argument(
-        '--n-layers',
-        type=int,
-        default=2,
-        help='Number of layers in the neural network (default: 2)'
-    )
-    
-    parser.add_argument(
-        '--layer-size',
-        type=int,
-        default=64,
-        help='Size of each hidden layer (default: 64)'
-    )
-    
-    parser.add_argument(
-        '--dropout',
-        type=float,
-        default=0.1,
-        help='Dropout rate for main body (default: 0.1)'
-    )
-    
-    parser.add_argument(
-        '--mean-head-dropout',
-        type=float,
-        default=0.1,
-        help='Dropout rate for mean head (default: 0.1)'
-    )
-    
-    parser.add_argument(
-        '--lr',
-        type=float,
-        default=0.001,
-        help='Learning rate (default: 0.001)'
-    )
-    
-    # Optimization options
-    parser.add_argument(
-        '--n-trials',
-        type=int,
-        default=4,
-        help='Number of Optuna trials (default: 48)'
-    )
-    
-    # Other options
-    parser.add_argument(
-        '--train-size',
-        type=float,
-        default=0.8,
-        help='Fraction of data to use for training (default: 0.8)'
-    )
-    
-    parser.add_argument(
-        '--seed',
-        type=int,
-        default=42,
-        help='Random seed for reproducibility (default: 42)'
-    )
-    
-    parser.add_argument(
-        '-v', '--verbose',
-        action='store_true',
-        help='Enable verbose output'
-    )
-    
-    return parser.parse_args()
 
 
 def save_results(results_dir, dataset_name, model_name, wrapper_name, mean_pred, var_pred, y_test):
@@ -387,7 +242,7 @@ def main():
     
     # Note: Best parameters are saved during optimization in the optimized version
     # No need to save again after training
-    
+     
     if args.verbose:
         print("Model Metrics:")
         print_metrics(metrics)
