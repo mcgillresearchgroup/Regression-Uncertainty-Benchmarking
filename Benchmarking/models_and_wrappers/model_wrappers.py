@@ -258,6 +258,7 @@ class MLP_Ensemble(Base_Model_Wrapper):
 
 class MVE_Single(MVE_Ensemble_Averaged):
     """Single MVE model (n_models=1)."""
+    output_variance = True
     def __init__(self, lr=0.001, epochs=100, n_layers=2, layer_size=64, num_features=10, 
                  num_targets=1, dropout=0.0, mean_head_dropout=0.0, base_model='MVE_Default', batch_size=None):
         super().__init__(lr, epochs, n_models=1, n_layers=n_layers, layer_size=layer_size, 
@@ -267,7 +268,8 @@ class MVE_Single(MVE_Ensemble_Averaged):
 
 
 class MVE_Ensemble_Multiplicative(MVE_Ensemble_Averaged):
-    """Ensemble using geometric mean aggregation."""
+    """Ensemble using multiplicative aggregation."""
+    output_variance = True
     def predict(self, X):
         X = np.asarray(X, dtype=np.float32)
         self.data_check(X=X)

@@ -24,64 +24,6 @@ from hyperparameter_optimization import (
 )
 
 
-def save_results(results_dir, dataset_name, model_name, wrapper_name, mean_pred, var_pred, y_test):
-    """Save model predictions and metrics to file."""
-    results_dir = Path(results_dir)
-    results_dir.mkdir(exist_ok=True)
-    
-    # Calculate metrics
-    mse = mean_squared_error(y_test, mean_pred)
-    mae = mean_absolute_error(y_test, mean_pred)
-    r2 = r2_score(y_test, mean_pred)
-    var_pred_clipped = np.clip(var_pred, min=1e-6, max=1e6)
-    nll = negative_log_likelihood(y_test, mean_pred, var_pred_clipped)
-    
-    mean_list = mean_pred.flatten().tolist()
-    var_list = var_pred.flatten().tolist()
-    y_true_array = np.asarray(y_test).flatten()
-    y_true_list = y_true_array.tolist()
-    # Create filename
-    timestamp = pd.Timestamp.now().strftime('%Y%m%d_%H%M%S')
-    filename = results_dir / f"{dataset_name}_{wrapper_name}_{model_name}_{timestamp}.json"
-    
-    # Prepare results
-    results = {
-        'dataset': dataset_name,
-        'model': model_name,
-        'wrapper': wrapper_name,
-        'timestamp': timestamp,
-        'metrics': {
-            'nll': float(nll),
-            'mse': float(mse),
-            'mae': float(mae),
-            'rmse': float(np.sqrt(mse)),
-            'r2': float(r2),
-            'n_samples': int(len(y_test))
-        },
-        'accuracy': {
-            'mean': mean_list,
-            'variance': var_list,
-            'ground_truth': y_true_list
-        }
-    }
-    
-    # Save to file
-    with open(filename, 'w') as f:
-        json.dump(results, f, indent=2)
-    
-    return filename, results['metrics'], nll
-
-
-def print_metrics(metrics):
-    """Print model metrics."""
-    print(f"  NLL: {metrics['nll']:.6f}")
-    print(f"  MSE: {metrics['mse']:.6f}")
-    print(f"  MAE: {metrics['mae']:.6f}")
-    print(f"  RMSE: {metrics['rmse']:.6f}")
-    print(f"  R²: {metrics['r2']:.6f}")
-    print(f"  N Samples: {metrics['n_samples']}")
-
-
 def main():
     """Main execution function."""
     args = parse_args()

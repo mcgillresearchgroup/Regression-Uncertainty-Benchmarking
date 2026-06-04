@@ -168,6 +168,7 @@ def get_model_label(wrapper, model):
         Clean abbreviated label (e.g., 'MEA-MD')
     """
     wrapper_map = {
+        'MVE_Single': 'MVS',
         'MVE_Ensemble': 'MEA',  # Legacy name
         'MVE_Ensemble_Averaged': 'MEA',
         'MVE_Ensemble_Multiplicative': 'MEM',
