@@ -1,10 +1,12 @@
 from abc import abstractmethod
+import torch
 import torch.nn as nn
 import numpy as np
 import warnings
 from sklearn.preprocessing import StandardScaler, RobustScaler
 from sklearn.base import BaseEstimator, RegressorMixin
 
+torch.manual_seed(39)  # Set seed for reproducibility in training
 warnings.filterwarnings('ignore', message='.*X has feature names.*')
 
 # Base model class
@@ -72,6 +74,10 @@ class MVE_Mean_Head_Extension(BaseModel):
             self.module_sequence_head_list.append(nn.ReLU())
             self.module_sequence_head_list.append(nn.Dropout(self.mean_head_dropout))
             self.size_in = self.mean_head_layer_size
+        
+        # Final output heads
+        self.mean_head = nn.Linear(self.size_in, self.num_targets)
+        self.var_head = nn.Linear(self.size_in, self.num_targets)
         
     def forward(self, x):
         for layer in self.module_sequence_body_list:

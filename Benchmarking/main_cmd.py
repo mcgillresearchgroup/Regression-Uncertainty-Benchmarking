@@ -26,9 +26,10 @@ def parse_args():
     )
     parser.add_argument(
         '--use-best',
+        nargs='?',
         const=None,
         type=str,
-        help='Use best hyperparameters from optimization. Provide path to JSON config file (e.g. results/best_parameters.json). If not specified, runs optimization for each combination.'
+        help='Use best hyperparameters from optimization. Provide path to JSON config file (e.g. results/best_parameters.json). If not specified, uses best_parameters.json.'
     )
     return parser.parse_args()
 
@@ -55,6 +56,8 @@ def run_training(combinations_to_run=None, use_best=False):
         
         if use_best is not None:
             cmd.extend(["--use-best", use_best])
+        elif use_best is None:
+            cmd.extend(["--use-best"])
         else:
             cmd.append("--optimize")
         

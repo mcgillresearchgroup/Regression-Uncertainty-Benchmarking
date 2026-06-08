@@ -2,13 +2,13 @@ import argparse
 import json
 import numpy as np
 import pandas as pd
-import pathlib as Path
+from pathlib import Path
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
 
 # Dictionaries of available datasets, models, and wrappers
 from data_dictionaries import load_dataset, data_pull_dict
 from models_and_wrappers.base_model_list import base_model_list_dict
-from Benchmarking.models_and_wrappers.model_wrappers import wrapper_list_dict
+from models_and_wrappers.model_wrappers import wrapper_list_dict
 
 # Available options
 DATASETS = list(data_pull_dict.keys())
@@ -145,7 +145,7 @@ Examples:
         '--seed',
         type=int,
         default=42,
-        help='Random seed for reproducibility (default: 42)'
+        help='Random seed used if hyperparameter optimization is not run (default: 42)'
     )
     
     parser.add_argument(
@@ -176,7 +176,7 @@ def get_model_label(wrapper, model):
     }
     model_map = {
         'MVE_Default': 'MD',
-        'MVE_Mean_Head_Extension': 'MMH',
+        'MVE_Mean_Head_Extension': 'MH',
         'MLP_Default': 'MLP',
     }
     
@@ -194,7 +194,7 @@ def negative_log_likelihood(y_true, y_pred_mean, y_pred_var, eps=1e-6):
             y_pred_var: Predicted variance values from the model
             eps: Small constant to prevent division by zero in variance
         Returns:
-            The negative log-likelihood.
+            The negative log-likelihood. (as a mean of all samples)
         """
     y_pred_var = np.maximum(y_pred_var, eps)  # Ensure minimum variance
     nll = 0.5 * np.log(2*np.pi*y_pred_var) + ((y_true - y_pred_mean) ** 2) / (2 * y_pred_var)

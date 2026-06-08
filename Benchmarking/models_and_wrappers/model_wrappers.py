@@ -7,6 +7,7 @@ import warnings
 import gc
 from sklearn.preprocessing import StandardScaler, RobustScaler
 from sklearn.base import BaseEstimator, RegressorMixin
+from sklearn.model_selection import KFold
 from .base_model_list import base_model_list_dict
 from abc import ABC, abstractmethod
 
@@ -147,6 +148,36 @@ class Base_Model_Wrapper(ABC):
             if torch.cuda.is_available():
                 torch.cuda.empty_cache()
             gc.collect()
+
+    def cross_validate(self, X, y, n_splits=10):
+        """Perform cross-validation and return metrics.
+        Inputs:
+            X: Input features
+            y: Target values
+            n_splits: Number of cross-validation folds
+        Returns:
+            mean_pred: Mean predictions across folds
+            var_pred: Variance predictions across folds (if output_variance == True: returns variance, else: returns None)"""
+        
+        kf = KFold(n_splits=n_splits, shuffle=True, random_state=67)
+        mean_preds = []
+        var_preds = []
+        y_true = []
+        for fold_idx, (train_idx, val_idx) in enumerate(kf.split(X)):
+            X_train, X_val = X.iloc[train_idx], X.iloc[val_idx]
+            y_train, y_val = y.iloc[train_idx], y.iloc[val_idx]
+            
+            self.fit(X_train, y_train)
+            mean_pred, var_pred = self.predict(X_val)
+            mean_preds.append(mean_pred)
+            var_preds.append(var_pred)
+            y_true.append(y_val)
+
+        mean_pred = np.concatenate(mean_preds, axis=0)
+        var_pred = np.concatenate(var_preds, axis=0) if self.output_variance else None
+        y_true = np.concatenate(y_true, axis=0)
+        
+        return mean_pred, var_pred, y_true
 
     @abstractmethod
     def predict(self, X):

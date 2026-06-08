@@ -30,7 +30,7 @@ def main():
     
     # Set seed
     np.random.seed(args.seed)
-    
+     
     if args.verbose:
         print(f"Configuration (OPTIMIZED):")
         print(f"  Dataset: {args.dataset}")
@@ -67,17 +67,10 @@ def main():
     
     # Determine hyperparameters based on mode
     if args.optimize:
-        # First, split the data
-        X_train, X_test, y_train, y_test = train_test_split(
-            X, y, train_size=args.train_size, random_state=args.seed
-        )
         
-        if args.verbose:
-            print(f"Train/Test split: {len(X_train)} / {len(X_test)}\n")
-        
-        # Run hyperparameter optimization with pre-split data
+        # Run hyperparameter optimization
         best_params, best_nll, _ = run_hyperparameter_optimization(
-            X_train, y_train, X_test, y_test, wrapper_class, args.model, 
+            X, y, wrapper_class, args.model, 
             num_features, num_targets,
             n_trials=args.n_trials, verbose=args.verbose, batch_size=128, use_kfold=True, n_splits=10
         )
@@ -113,7 +106,7 @@ def main():
         }
         hp_source = "best parameters (merged with user-specified values)"
 
-    elif best_params is None:
+    else:
         if args.verbose:
             print(f'Using default parameters')
         hp = {
@@ -127,61 +120,21 @@ def main():
         } 
         hp_source = "default parameters"
     
-    # Split data if not already done (in optimize mode it's already split)
-    if not args.optimize:
-        X_train, X_test, y_train, y_test = train_test_split(
-            X, y, train_size=args.train_size, random_state=args.seed
-        )
-        if args.verbose and not args.use_best:
-            print(f"Train/Test split: {len(X_train)} / {len(X_test)}\n")
-    
-    # Create model wrapper
-    if args.verbose:
-        print(f"Creating {args.wrapper} with {args.model} base model...")
-        print(f"Using hyperparameters from: {hp_source}\n")
-    
-    # Create wrapper instance with selected parameters
-    try:
-        model = create_model_wrapper(
-            wrapper_class, args.model, num_features, num_targets,
-            hp['lr'], hp['epochs'], hp['n_layers'], hp['layer_size'],
-            hp['dropout'], hp['mean_head_dropout'], hp['n_models']
-        )
-    except TypeError as e:
-        print(f"Error creating model: {e}")
-        sys.exit(1)
-    
-    if args.verbose:
-        print(f"Model created successfully.\n")
-        print("Training model...")
-    
-    # Train model
-    try:
-        model.fit(X_train, y_train)
-    except Exception as e:
-        print(f"Error during training: {e}")
-        sys.exit(1)
-    
-    if args.verbose:
-        print("Training complete.\n")
-        print("Generating predictions...")
-    
-    # Make predictions
-    try:
-        mean_pred, var_pred = model.predict(X_test)
-    except Exception as e:
-        print(f"Error during prediction: {e}")
-        sys.exit(1)
-    
-    if args.verbose:
-        print(f"Predictions generated: mean shape {mean_pred.shape}, var shape {var_pred.shape}\n")
-        print(f"Mean predictions - Min: {mean_pred.min():.4f}, Max: {mean_pred.max():.4f}, Mean: {mean_pred.mean():.4f}")
-        print(f"Variance predictions - Min: {var_pred.min():.4f}, Max: {var_pred.max():.4f}, Mean: {var_pred.mean():.4f}\n")
-    
+
+    # Create model wrapper with selected hyperparameters and run a cross validation training to get final metrics
+    model_wrapper = create_model_wrapper(
+        wrapper_class, args.model, num_features, num_targets,
+        hp['lr'], hp['epochs'], hp['n_layers'], hp['layer_size'], 
+        hp['dropout'], hp['mean_head_dropout'], hp['n_models'], batch_size=128
+    )
+
+    cross_evaluation_folds = 10
+    mean_pred, var_pred, y_true = model_wrapper.cross_validate(X, y, n_splits=cross_evaluation_folds)
+
     # Save results
-    results_dir = Path('./results')
-    filename, metrics, nll = save_results(results_dir, args.dataset, args.model, args.wrapper, mean_pred, var_pred, y_test)
-    
+    results_dir = Path('./best_params_and_all_results')
+    filename, metrics, nll = save_results(results_dir, args.dataset, args.model, args.wrapper, mean_pred, var_pred, y_true)
+
     # Note: Best parameters are saved during optimization in the optimized version
     # No need to save again after training
      

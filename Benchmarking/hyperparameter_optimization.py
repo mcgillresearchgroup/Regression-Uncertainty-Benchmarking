@@ -8,8 +8,8 @@ from optuna.samplers import TPESampler
 from pathlib import Path
 import gc
 import sys
-from sklearn.model_selection import KFold
-from Benchmarking.models_and_wrappers.model_wrappers import MVE_Single
+from sklearn.model_selection import KFold, train_test_split
+from models_and_wrappers.model_wrappers import MVE_Single
 from utils import negative_log_likelihood
 
 
@@ -31,7 +31,7 @@ def create_model_wrapper(wrapper_class, base_model, num_features, num_targets, l
     )
 
 
-def create_objective(X_train, y_train, X_test, y_test, wrapper_class, base_model, 
+def create_objective(X, y, wrapper_class, base_model, 
                     num_features, num_targets, verbose=False, batch_size=128, use_kfold=True, n_splits=10):
     """Create an Optuna objective function.
     
@@ -52,22 +52,22 @@ def create_objective(X_train, y_train, X_test, y_test, wrapper_class, base_model
             n_models = trial.suggest_categorical('n_models', [5])
         else:
             n_models = 1
-        
+
         model = None
         try:
             if use_kfold:
-                # K-fold cross-validation
-                kf = KFold(n_splits=n_splits, shuffle=True, random_state=42)
+                # K-fold cross-validation on full dataset
+                kf = KFold(n_splits=n_splits, shuffle=True, random_state=44)
                 scores = []
                 
-                for fold_idx, (train_idx, val_idx) in enumerate(kf.split(X_train)):
+                for fold_idx, (train_idx, val_idx) in enumerate(kf.split(X)):
                     # Use .iloc for positional indexing with pandas DataFrames
-                    if hasattr(X_train, 'iloc'):
-                        X_tr, X_val = X_train.iloc[train_idx], X_train.iloc[val_idx]
-                        y_tr, y_val = y_train.iloc[train_idx], y_train.iloc[val_idx]
+                    if hasattr(X, 'iloc'):
+                        X_tr, X_val = X.iloc[train_idx], X.iloc[val_idx]
+                        y_tr, y_val = y.iloc[train_idx], y.iloc[val_idx]
                     else:
-                        X_tr, X_val = X_train[train_idx], X_train[val_idx]
-                        y_tr, y_val = y_train[train_idx], y_train[val_idx]
+                        X_tr, X_val = X[train_idx], X[val_idx]
+                        y_tr, y_val = y[train_idx], y[val_idx]
                     
                     model = create_model_wrapper(
                         wrapper_class, base_model, num_features, num_targets,
@@ -98,6 +98,9 @@ def create_objective(X_train, y_train, X_test, y_test, wrapper_class, base_model
                     print(f"  Trial {trial.number} NLL: {nll:.6f} (cv), Layers: {n_layers}, Size: {layer_size}, Epochs: {epochs}")
             else:
                 # Single train/test split
+                X_train, X_test, y_train, y_test = train_test_split(
+                    X, y, train_size=0.8, random_state=81)
+                
                 model = create_model_wrapper(
                     wrapper_class, base_model, num_features, num_targets,
                     lr, epochs, n_layers, layer_size, dropout, mean_head_dropout, 
@@ -140,7 +143,7 @@ def create_objective(X_train, y_train, X_test, y_test, wrapper_class, base_model
     return objective
 
 
-def run_hyperparameter_optimization(X_train, y_train, X_test, y_test, wrapper_class, 
+def run_hyperparameter_optimization(X, y, wrapper_class, 
                                    base_model, num_features, num_targets, 
                                    verbose=False, batch_size=128, n_trials=4, use_kfold=True, n_splits=3):
     """Run optimized hyperparameter optimization.
@@ -152,7 +155,7 @@ def run_hyperparameter_optimization(X_train, y_train, X_test, y_test, wrapper_cl
         n_splits: Number of folds for cross-validation (default: 5)
     """
     
-    sampler = TPESampler(seed=42)
+    sampler = TPESampler(seed=43)
     pruner = MedianPruner(n_startup_trials=np.round(n_trials * 0.125, decimals=0), n_warmup_steps=0)
     
     study = optuna.create_study(
@@ -162,7 +165,7 @@ def run_hyperparameter_optimization(X_train, y_train, X_test, y_test, wrapper_cl
     )
     
     objective = create_objective(
-        X_train, y_train, X_test, y_test, wrapper_class, base_model,
+        X, y, wrapper_class, base_model,
         num_features, num_targets, verbose=verbose, batch_size=batch_size,
         use_kfold=use_kfold, n_splits=n_splits
     )
