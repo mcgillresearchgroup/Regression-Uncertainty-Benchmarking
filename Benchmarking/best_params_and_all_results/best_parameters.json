@@ -4,55 +4,14 @@
         "wrapper": "MVE_Ensemble_Averaged",
         "model": "MVE_Default",
         "parameters": {
-            "lr": 0.0006358358856676254,
+            "lr": 0.0010243196265020409,
             "epochs": 160,
-            "n_layers": 2,
-            "layer_size": 120,
+            "n_layers": 6,
+            "layer_size": 72,
             "dropout": 0.0,
-            "mean_head_dropout": 0.1,
+            "mean_head_dropout": 0.0,
             "n_models": 5
-        }
-    },
-    "Concrete Compressive Strength_MVE_Ensemble_Averaged_MVE_Mean_Head_Extension": {
-        "dataset": "Concrete Compressive Strength",
-        "wrapper": "MVE_Ensemble_Averaged",
-        "model": "MVE_Mean_Head_Extension",
-        "parameters": {
-            "lr": 0.0001329291894316216,
-            "epochs": 200,
-            "n_layers": 7,
-            "layer_size": 80,
-            "dropout": 0.0,
-            "mean_head_dropout": 0.1,
-            "n_models": 5
-        }
-    },
-    "Concrete Compressive Strength_MVE_Ensemble_Multiplicative_MVE_Default": {
-        "dataset": "Concrete Compressive Strength",
-        "wrapper": "MVE_Ensemble_Multiplicative",
-        "model": "MVE_Default",
-        "parameters": {
-            "lr": 0.0006358358856676254,
-            "epochs": 160,
-            "n_layers": 2,
-            "layer_size": 120,
-            "dropout": 0.0,
-            "mean_head_dropout": 0.1,
-            "n_models": 5
-        }
-    },
-    "Concrete Compressive Strength_MVE_Ensemble_Multiplicative_MVE_Mean_Head_Extension": {
-        "dataset": "Concrete Compressive Strength",
-        "wrapper": "MVE_Ensemble_Multiplicative",
-        "model": "MVE_Mean_Head_Extension",
-        "parameters": {
-            "lr": 0.0001329291894316216,
-            "epochs": 200,
-            "n_layers": 7,
-            "layer_size": 80,
-            "dropout": 0.0,
-            "mean_head_dropout": 0.1,
-            "n_models": 5
-        }
+        },
+        "best_nll": 4.076122319803432
     }
 }

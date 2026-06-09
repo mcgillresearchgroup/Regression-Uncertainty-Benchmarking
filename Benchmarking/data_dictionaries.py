@@ -52,6 +52,19 @@ class AppliancesEnergyPrediction(Dataset):
     """Appliances Energy Prediction dataset."""
     name = 'Appliances Energy Prediction'
     id = 374
+    def load(self):
+        """Load Appliances Energy Prediction dataset."""
+        dataset = fetch_ucirepo(id=self.id)
+        data_x = dataset.data.features
+        data_y = dataset.data.targets
+        datetime = data_x['date']
+        data_x = data_x.drop(columns=['date'])
+        for i in len(datetime):
+            datetime[i].split()
+            datetime[i].split(':')
+            datetime[i].split('-')
+            
+        return data_x, data_y, data_x.shape[1], data_y.shape[1]
 
 
 class RTIoT2022(Dataset):
@@ -69,9 +82,9 @@ class ConcreteCompressiveStrength(Dataset):
 # Dictionary mapping dataset names to classes
 DATASETS = {
     'Wine_Quality': WineQuality,
-    'Appliances Energy Prediction': AppliancesEnergyPrediction,
+    'Appliances_Energy_Prediction': AppliancesEnergyPrediction,
     'RT-IoT2022': RTIoT2022,
-    'Concrete Compressive Strength': ConcreteCompressiveStrength,
+    'Concrete_Compressive_Strength': ConcreteCompressiveStrength,
 }
 
 # Reverse mapping for ID lookup

@@ -39,9 +39,9 @@ Examples:
     parser.add_argument(
         '-d', '--dataset',
         type=str,
-        required=True,
         choices=DATASETS,
-        help=f'Dataset to use. Options: {", ".join(DATASETS)}'
+        default=DATASETS[0],
+        help=f'Dataset to use for training and evaluation (default: first dataset in dataset list: {DATASETS[0]})'
     )
     
     parser.add_argument(
@@ -129,7 +129,7 @@ Examples:
     parser.add_argument(
         '--n-trials',
         type=int,
-        default=4,
+        default=10,
         help='Number of Optuna trials (default: 48)'
     )
     

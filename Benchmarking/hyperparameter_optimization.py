@@ -178,6 +178,8 @@ def run_hyperparameter_optimization(X, y, wrapper_class,
 def save_best_parameters(best_params, dataset, wrapper_name, model_name, filepath=None, best_nll=None):
     """Save best hyperparameters to JSON file with consistent formatting.
     
+    Only overwrites existing parameters if the new NLL is lower than the existing one.
+    
     Args:
         best_params: Dictionary of hyperparameters
         dataset: Dataset name
@@ -187,7 +189,7 @@ def save_best_parameters(best_params, dataset, wrapper_name, model_name, filepat
         best_nll: Best NLL value (optional)
     """
     if filepath is None:
-        filepath = Path('results/best_parameters.json')
+        filepath = Path('best_params_and_all_results/best_parameters.json')
     
     filepath.parent.mkdir(parents=True, exist_ok=True)
     
@@ -200,6 +202,15 @@ def save_best_parameters(best_params, dataset, wrapper_name, model_name, filepat
     
     # Create unique key
     key = f"{dataset}_{wrapper_name}_{model_name}"
+    
+    # Check if key exists and if we should skip based on NLL comparison
+    if key in all_params and best_nll is not None:
+        existing_entry = all_params[key]
+        existing_nll = existing_entry.get("best_nll")
+        
+        if existing_nll is not None and best_nll >= existing_nll:
+            print(f"Skipping save for {key}: new NLL ({best_nll:.6f}) is not lower than existing NLL ({existing_nll:.6f})")
+            return
     
     # Format with consistent structure
     formatted_entry = {
