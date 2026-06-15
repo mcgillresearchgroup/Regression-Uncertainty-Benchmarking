@@ -13,5 +13,35 @@
             "n_models": 5
         },
         "best_nll": 4.076122319803432
+    },
+    "Appliances_Energy_Prediction_MVE_Ensemble_Averaged_MVE_Default": {
+        "dataset": "Appliances_Energy_Prediction",
+        "wrapper": "MVE_Ensemble_Averaged",
+        "model": "MVE_Default",
+        "parameters": {
+            "lr": 0.001751103577844246,
+            "epochs": 160,
+            "n_layers": 6,
+            "layer_size": 24,
+            "dropout": 0.0,
+            "mean_head_dropout": 0.0,
+            "n_models": 5
+        },
+        "best_nll": 5.087966006766419
+    },
+    "Red_Wine_Quality_MVE_Ensemble_Averaged_MVE_Default": {
+        "dataset": "Red_Wine_Quality",
+        "wrapper": "MVE_Ensemble_Averaged",
+        "model": "MVE_Default",
+        "parameters": {
+            "lr": 0.007229706435025275,
+            "epochs": 100,
+            "n_layers": 8,
+            "layer_size": 88,
+            "dropout": 0.0,
+            "mean_head_dropout": 0.0,
+            "n_models": 5
+        },
+        "best_nll": 0.9237825575279576
     }
 }

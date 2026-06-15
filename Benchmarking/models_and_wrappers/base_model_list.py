@@ -27,7 +27,6 @@ class BaseModel(nn.Module):
             self.size_out = self.layer_size
             self.module_sequence_body_list.append(nn.Linear(self.size_in, self.size_out))
             self.module_sequence_body_list.append(nn.ReLU())
-            self.module_sequence_body_list.append(nn.Dropout(self.dropout))  # Add dropout
             self.size_in = self.layer_size
     
     def module_sequence_head(self):
@@ -39,8 +38,8 @@ class BaseModel(nn.Module):
 
 
 class MVE_Default(BaseModel):
-    def __init__(self, n_layers, layer_size, num_features, num_targets, dropout=0.0):
-        super().__init__(n_layers, layer_size, num_features, num_targets, dropout)
+    def __init__(self, n_layers, layer_size, num_features, num_targets):
+        super().__init__(n_layers, layer_size, num_features, num_targets)
         self.module_sequence_body()
         self.module_sequence_head()
     
@@ -57,22 +56,20 @@ class MVE_Default(BaseModel):
     
     
 class MVE_Mean_Head_Extension(BaseModel):
-    def __init__(self, n_layers, layer_size, num_features, num_targets, dropout=0.0, mean_head_dropout=0.0, mean_head_n_layers=2, mean_head_layer_size=None):
-        super().__init__(n_layers, layer_size, num_features, num_targets, dropout)
+    def __init__(self, n_layers, layer_size, num_features, num_targets, mean_head_n_layers=2, mean_head_layer_size=None):
+        super().__init__(n_layers, layer_size, num_features, num_targets)
         self.mean_head_n_layers = mean_head_n_layers
         self.mean_head_layer_size = mean_head_layer_size if mean_head_layer_size is not None else layer_size
-        self.mean_head_dropout = mean_head_dropout
         self.module_sequence_body()
         self.module_sequence_head()
 
     def module_sequence_head(self):
         # Extended mean head with additional layers
         self.module_sequence_head_list = nn.ModuleList()
-        for i in range(self.mean_head_n_layers - 1):
+        for i in range(self.mean_head_n_layers):
             self.size_out = self.mean_head_layer_size
             self.module_sequence_head_list.append(nn.Linear(self.size_in, self.size_out))
             self.module_sequence_head_list.append(nn.ReLU())
-            self.module_sequence_head_list.append(nn.Dropout(self.mean_head_dropout))
             self.size_in = self.mean_head_layer_size
         
         # Final output heads
@@ -90,8 +87,8 @@ class MVE_Mean_Head_Extension(BaseModel):
         return mean, var
         
 class MLP_Default(BaseModel):
-    def __init__(self, n_layers, layer_size, num_features, num_targets, dropout=0.0):
-        super().__init__(n_layers, layer_size, num_features, num_targets, dropout)
+    def __init__(self, n_layers, layer_size, num_features, num_targets):
+        super().__init__(n_layers, layer_size, num_features, num_targets)
         self.module_sequence_body()
         self.output_head = nn.Linear(self.size_in, num_targets)
 

@@ -3,6 +3,15 @@
   "model": "MVE_Default",
   "wrapper": "MVE_Ensemble_Averaged",
   "timestamp": "20260608_135624",
+  "parameters": {
+    "lr": 0.0010243196265020409,
+    "epochs": 160,
+    "n_layers": 6,
+    "layer_size": 72,
+    "dropout": 0.0,
+    "mean_head_dropout": 0.0,
+    "n_models": 5
+  },
   "metrics": {
     "nll": 4.079200773558976,
     "mse": 26.855198032502734,

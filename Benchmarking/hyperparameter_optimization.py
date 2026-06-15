@@ -14,7 +14,7 @@ from utils import negative_log_likelihood
 
 
 def create_model_wrapper(wrapper_class, base_model, num_features, num_targets, lr, epochs, 
-                        n_layers, layer_size, dropout, mean_head_dropout, n_models=5, batch_size=32):
+                        n_layers, layer_size, mean_head_n_layers, mean_head_layer_size, n_models=5, batch_size=32):
     """Create a model wrapper instance with the specified parameters."""
     return wrapper_class(
         lr=lr,
@@ -24,10 +24,10 @@ def create_model_wrapper(wrapper_class, base_model, num_features, num_targets, l
         layer_size=layer_size,
         num_features=num_features,
         num_targets=num_targets,
-        dropout=dropout,
-        mean_head_dropout=mean_head_dropout,
         base_model=base_model,
-        batch_size=batch_size
+        batch_size=batch_size,
+        mean_head_n_layers=mean_head_n_layers,
+        mean_head_layer_size=mean_head_layer_size
     )
 
 
@@ -45,9 +45,14 @@ def create_objective(X, y, wrapper_class, base_model,
         epochs = trial.suggest_int('epochs', 20, 200, step=20)  # Reduced max from 400
         n_layers = trial.suggest_int('n_layers', 2, 8)  # Reduced max from 10
         layer_size = trial.suggest_int('layer_size', 16, 120, step=8)  # Reduced max from 200
-        dropout = trial.suggest_categorical('dropout', [0.0, 0.1])
-        mean_head_dropout = trial.suggest_categorical('mean_head_dropout', [0.0, 0.1])
-        
+
+        if base_model == 'MVE_Mean_Head_Extension':
+            mean_head_layer_size = trial.suggest_int('mean_head_layer_size', 16, 120, step=8)
+            mean_head_n_layers = trial.suggest_int('mean_head_n_layers', 1, 4)
+        else:
+            mean_head_layer_size = None
+            mean_head_n_layers = None
+
         if wrapper_class != MVE_Single:
             n_models = trial.suggest_categorical('n_models', [5])
         else:
@@ -71,8 +76,8 @@ def create_objective(X, y, wrapper_class, base_model,
                     
                     model = create_model_wrapper(
                         wrapper_class, base_model, num_features, num_targets,
-                        lr, epochs, n_layers, layer_size, dropout, mean_head_dropout, 
-                        n_models, batch_size=batch_size
+                        lr, epochs, n_layers, layer_size, 
+                        mean_head_n_layers, mean_head_layer_size, n_models, batch_size
                     )
                     
                     model.fit(X_tr, y_tr)
@@ -103,8 +108,8 @@ def create_objective(X, y, wrapper_class, base_model,
                 
                 model = create_model_wrapper(
                     wrapper_class, base_model, num_features, num_targets,
-                    lr, epochs, n_layers, layer_size, dropout, mean_head_dropout, 
-                    n_models, batch_size=batch_size
+                    lr, epochs, n_layers, layer_size,  
+                    mean_head_n_layers, mean_head_layer_size, n_models, batch_size=batch_size
                 )
                 
                 model.fit(X_train, y_train)
