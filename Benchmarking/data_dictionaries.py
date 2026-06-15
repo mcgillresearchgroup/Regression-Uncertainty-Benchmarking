@@ -1,7 +1,8 @@
+from sklearn.preprocessing import OneHotEncoder
 from ucimlrepo import fetch_ucirepo 
 import pandas as pd
 from abc import ABC, abstractmethod
-
+import datetime as dt
 
 class Dataset(ABC):
     """Base class for datasets."""
@@ -17,14 +18,15 @@ class Dataset(ABC):
         dataset = fetch_ucirepo(id=self.id)
         data_x = dataset.data.features
         data_y = dataset.data.targets
-        return data_x, data_y, data_x.shape[1], data_y.shape[1]
+        return data_x, data_y, data_x.shape[1], data_y.shape[1] if len(data_y.shape) > 1 else 1
 
 
 class WineQuality(Dataset):
     """Wine Quality dataset with color selection."""
-    name = 'Wine_Quality'
-    id = 186
-    
+    def __init__(self, wine_color=None):
+        self.name = 'Wine_Quality'
+        self.id = 186
+        self.wine_color = wine_color
     def load(self):
         """Load Wine Quality dataset and prompt for wine color selection."""
         dataset = fetch_ucirepo(id=self.id)
@@ -34,24 +36,40 @@ class WineQuality(Dataset):
         red_wine = red_wine.drop(columns=['color'])
         white_wine = white_wine.drop(columns=['color'])
 
-        wine_type = input("Choose wine type (red/white): ")
-        if wine_type == 'red':
+        if self.wine_color == 'red':
             data_x = red_wine.drop(columns=['quality'])
             data_y = pd.DataFrame(red_wine['quality'])
-        elif wine_type == 'white':
+            self.name = 'Red_Wine_Quality'
+        elif self.wine_color == 'white':
             data_x = white_wine.drop(columns=['quality'])
             data_y = pd.DataFrame(white_wine['quality'])
-        else:
-            print("Invalid wine type. Please enter 'red' or 'white'.")
-            return None, None, None, None
+            self.name = 'White_Wine_Quality'
         
-        return data_x, data_y, data_x.shape[1], data_y.shape[1]
+        return data_x, data_y, data_x.shape[1], data_y.shape[1] if len(data_y.shape) > 1 else 1
 
 
 class AppliancesEnergyPrediction(Dataset):
     """Appliances Energy Prediction dataset."""
     name = 'Appliances Energy Prediction'
     id = 374
+    def load(self):
+        """Load Appliances Energy Prediction dataset."""
+        #try: 
+        dataset = fetch_ucirepo(id=self.id)
+        data_x = dataset.data.features
+        data_y = dataset.data.targets
+        datetime_data = pd.to_datetime(data_x['date'], format='%Y-%m-%d%H:%M:%S')
+        #except Exception as e:
+            #df = pd.read_csv('temp_dataset_files/energydata_complete.csv')
+            #data_x = df.iloc[:, :-1]  # Select all columns except the last one
+            #data_y = df.iloc[:, -1]   # Select the last column as target
+            #datetime_data = pd.to_datetime(data_x['date'], format='%Y-%m-%d %H:%M:%S')
+        data_x.drop(columns=['date'], inplace=True)
+        jan_first = dt.date(datetime_data[0].year, 1, 1)
+        data_x['days_since_jan1'] = (datetime_data - pd.to_datetime(jan_first)).dt.days
+        data_x['hours_since_midnight'] = datetime_data.dt.hour + datetime_data.dt.minute / 60
+        data_x = pd.concat([data_x, pd.DataFrame(OneHotEncoder(sparse_output=False).fit_transform(datetime_data.dt.weekday.to_frame()), columns=[f'weekday_{i}' for i in range(7)])], axis=1)
+        return data_x, data_y, data_x.shape[1], data_y.shape[1] if len(data_y.shape) > 1 else 1
 
 
 class RTIoT2022(Dataset):
@@ -68,10 +86,11 @@ class ConcreteCompressiveStrength(Dataset):
 
 # Dictionary mapping dataset names to classes
 DATASETS = {
-    'Wine_Quality': WineQuality,
-    'Appliances Energy Prediction': AppliancesEnergyPrediction,
+    'Red_Wine_Quality': WineQuality(wine_color='red'),
+    'White_Wine_Quality': WineQuality(wine_color='white'),
+    #'Appliances_Energy_Prediction': AppliancesEnergyPrediction, ## Removed for now due to large dataset size, loading issues, and poor fit for regression.
     'RT-IoT2022': RTIoT2022,
-    'Concrete Compressive Strength': ConcreteCompressiveStrength,
+    'Concrete_Compressive_Strength': ConcreteCompressiveStrength,
 }
 
 # Reverse mapping for ID lookup

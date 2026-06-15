@@ -55,7 +55,7 @@ def main():
         print("Loading dataset...")
     
     X, y, num_features, num_targets = load_dataset(args.dataset)
-    
+    print(f"Dataset loaded: {X.shape[0]} samples, {num_features} features, {num_targets} target(s)\n")
     if X is None:
         print("Failed to load dataset.")
         sys.exit(1)
@@ -89,7 +89,6 @@ def main():
             #batch size hp to be added (Currently defaulting to 128)
         }
         
-        hp_source = "Optuna optimization (optimized)"
     elif args.use_best:
         # Try to load best parameters
         best_params = load_best_parameters(args.dataset, args.wrapper, args.model, file_path = args.use_best)
@@ -104,7 +103,6 @@ def main():
             'mean_head_dropout': args.mean_head_dropout if args.mean_head_dropout != None else float(params['mean_head_dropout']),
             'n_models': args.n_models if args.n_models != None else int(params.get('n_models', 5))
         }
-        hp_source = "best parameters (merged with user-specified values)"
 
     else:
         if args.verbose:
@@ -133,7 +131,7 @@ def main():
 
     # Save results
     results_dir = Path('./best_params_and_all_results')
-    filename, metrics, nll = save_results(results_dir, args.dataset, args.model, args.wrapper, mean_pred, var_pred, y_true)
+    filename, metrics, nll = save_results(results_dir, args.dataset, args.model, args.wrapper, mean_pred, var_pred, y_true, hyperparameters=hp)
 
     # Note: Best parameters are saved during optimization in the optimized version
     # No need to save again after training

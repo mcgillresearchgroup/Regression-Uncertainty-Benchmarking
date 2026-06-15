@@ -39,9 +39,9 @@ Examples:
     parser.add_argument(
         '-d', '--dataset',
         type=str,
-        required=True,
         choices=DATASETS,
-        help=f'Dataset to use. Options: {", ".join(DATASETS)}'
+        default=DATASETS[0],
+        help=f'Dataset to use for training and evaluation (default: first dataset in dataset list: {DATASETS[0]}). If not specified, runs all datasets.'
     )
     
     parser.add_argument(
@@ -60,14 +60,13 @@ Examples:
         help=f'Model wrapper for training. Options: {", ".join(WRAPPERS)}'
     )
     
-    # Hyperparameter selection mode
-    mode_group = parser.add_mutually_exclusive_group()
-    mode_group.add_argument(
+    hpo_mode_group = parser.add_mutually_exclusive_group()
+    hpo_mode_group.add_argument(
         '--optimize',
         action='store_true',
         help='Run hyperparameter optimization with Optuna'
     )
-    mode_group.add_argument(
+    hpo_mode_group.add_argument(
         '--use-best',
         nargs='?',
         const=None,
@@ -75,65 +74,13 @@ Examples:
         help='Use best parameters from previous optimization runs. Optionally specify a custom file path.'
     )
     
-    # Hyperparameters (used when not using --optimize or --use-best)
-    parser.add_argument(
-        '--epochs',
-        type=int,
-        default=100,
-        help='Number of training epochs (default: 100)'
-    )
-    
-    parser.add_argument(
-        '--n-models',
-        type=int,
-        default=5,
-        help='Number of models for ensemble (default: 5, ignored for MVE_Single)'
-    )
-    
-    parser.add_argument(
-        '--n-layers',
-        type=int,
-        default=2,
-        help='Number of layers in the neural network (default: 2)'
-    )
-    
-    parser.add_argument(
-        '--layer-size',
-        type=int,
-        default=64,
-        help='Size of each hidden layer (default: 64)'
-    )
-    
-    parser.add_argument(
-        '--dropout',
-        type=float,
-        default=0.1,
-        help='Dropout rate for main body (default: 0.1)'
-    )
-    
-    parser.add_argument(
-        '--mean-head-dropout',
-        type=float,
-        default=0.1,
-        help='Dropout rate for mean head (default: 0.1)'
-    )
-    
-    parser.add_argument(
-        '--lr',
-        type=float,
-        default=0.001,
-        help='Learning rate (default: 0.001)'
-    )
-    
-    # Optimization options
     parser.add_argument(
         '--n-trials',
         type=int,
-        default=4,
+        default=10,
         help='Number of Optuna trials (default: 48)'
     )
     
-    # Other options
     parser.add_argument(
         '--train-size',
         type=float,
@@ -200,8 +147,8 @@ def negative_log_likelihood(y_true, y_pred_mean, y_pred_var, eps=1e-6):
     nll = 0.5 * np.log(2*np.pi*y_pred_var) + ((y_true - y_pred_mean) ** 2) / (2 * y_pred_var)
     return np.mean(nll)
 
-
-def save_results(results_dir, dataset_name, model_name, wrapper_name, mean_pred, var_pred, y_test):
+# Add in the saving of the params used in the save results function, so that we can easily track which hyperparameters were used for each result file.
+def save_results(results_dir, dataset_name, model_name, wrapper_name, mean_pred, var_pred, y_test, hyperparameters=None):
     """Save model predictions and metrics to file."""
     results_dir = Path(results_dir)
     results_dir.mkdir(exist_ok=True)
@@ -227,6 +174,7 @@ def save_results(results_dir, dataset_name, model_name, wrapper_name, mean_pred,
         'model': model_name,
         'wrapper': wrapper_name,
         'timestamp': timestamp,
+        'hyperparameters': {hyper: value for hyper, value in (hyperparameters or {}).items()},
         'metrics': {
             'nll': float(nll),
             'mse': float(mse),
