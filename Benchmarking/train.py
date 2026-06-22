@@ -14,7 +14,8 @@ from utils import (
     print_metrics, 
     negative_log_likelihood, 
     get_model_label,
-    wrapper_list_dict
+    wrapper_list_dict,
+    base_model_list_dict
 )
 from hyperparameter_optimization import (
     create_model_wrapper, 
@@ -83,49 +84,44 @@ def main():
             'epochs': best_params['epochs'],
             'n_layers': best_params['n_layers'],
             'layer_size': best_params['layer_size'],
-            'dropout': best_params['dropout'],
-            'mean_head_dropout': best_params['mean_head_dropout'],
-            'n_models': best_params.get('n_models', 5)
-            #batch size hp to be added (Currently defaulting to 128)
+            'n_models': best_params.get('n_models', 5),
+            'mean_head_n_layers': best_params.get('mean_head_n_layers', None),
+            'mean_head_layer_size': best_params.get('mean_head_layer_size', None),
+            #batch size hp to be added (Currently defaulting to 256)
         }
         
-    elif args.use_best:
+    elif args.use_best is not None:
         # Try to load best parameters
-        best_params = load_best_parameters(args.dataset, args.wrapper, args.model, file_path = args.use_best)
-        params = best_params.get('parameters', best_params)
+        print(args.use_best)
+        best_params = load_best_parameters(args.dataset, args.wrapper, args.model, filepath = args.use_best)
+        print(f"best_params: {best_params}")
+        params = best_params.get('hyperparameters', best_params)
         
         hp = {
-            'lr': args.lr if args.lr != None else float(params['lr']),
-            'epochs': args.epochs if args.epochs != None else int(params['epochs']),
-            'n_layers': args.n_layers if args.n_layers != None else int(params['n_layers']),
-            'layer_size': args.layer_size if args.layer_size != None else int(params['layer_size']),
-            'dropout': args.dropout if args.dropout != None else float(params['dropout']),
-            'mean_head_dropout': args.mean_head_dropout if args.mean_head_dropout != None else float(params['mean_head_dropout']),
-            'n_models': args.n_models if args.n_models != None else int(params.get('n_models', 5))
+            #'lr': args.lr if args.lr != None else float(params['lr']),
+            #'epochs': args.epochs if args.epochs != None else int(params['epochs']),
+            #'n_layers': args.n_layers if args.n_layers != None else int(params['n_layers']),
+            #'layer_size': args.layer_size if args.layer_size != None else int(params['layer_size']),
+            #'n_models': args.n_models if args.n_models != None else int(params.get('n_models', 5)),
+            #'mean_head_n_layers': args.mean_head_n_layers if args.mean_head_n_layers != None else params.get('mean_head_n_layers', None),
+            #'mean_head_layer_size': args.mean_head_layer_size if args.mean_head_layer_size != None else params.get('mean_head_layer_size', None)
+            'lr': float(params['lr']),
+            'epochs': int(params['epochs']),
+            'n_layers': int(params['n_layers']),
+            'layer_size': int(params['layer_size']),
+            'n_models': int(params.get('n_models', 5)),
+            'mean_head_n_layers': params.get('mean_head_n_layers', None),
+            'mean_head_layer_size': params.get('mean_head_layer_size', None)
         }
 
-    else:
-        if args.verbose:
-            print(f'Using default parameters')
-        hp = {
-            'lr': args.lr,
-            'epochs': args.epochs,
-            'n_layers': args.n_layers,
-            'layer_size': args.layer_size,
-            'dropout': args.dropout,
-            'mean_head_dropout': args.mean_head_dropout,
-            'n_models': args.n_models 
-        } 
-        hp_source = "default parameters"
-    
 
     # Create model wrapper with selected hyperparameters and run a cross validation training to get final metrics
     model_wrapper = create_model_wrapper(
         wrapper_class, args.model, num_features, num_targets,
         hp['lr'], hp['epochs'], hp['n_layers'], hp['layer_size'], 
-        hp['dropout'], hp['mean_head_dropout'], hp['n_models'], batch_size=128
+        hp['mean_head_n_layers'], hp['mean_head_layer_size'], hp['n_models'], batch_size=128
     )
-
+    print(f"Batch Size: {128}")
     cross_evaluation_folds = 10
     mean_pred, var_pred, y_true = model_wrapper.cross_validate(X, y, n_splits=cross_evaluation_folds)
 

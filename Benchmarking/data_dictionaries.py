@@ -57,7 +57,6 @@ class AppliancesEnergyPrediction(Dataset):
         #try: 
         dataset = fetch_ucirepo(id=self.id)
         data_x = dataset.data.features
-        data_y = dataset.data.targets
         datetime_data = pd.to_datetime(data_x['date'], format='%Y-%m-%d%H:%M:%S')
         #except Exception as e:
             #df = pd.read_csv('temp_dataset_files/energydata_complete.csv')
@@ -69,6 +68,7 @@ class AppliancesEnergyPrediction(Dataset):
         data_x['days_since_jan1'] = (datetime_data - pd.to_datetime(jan_first)).dt.days
         data_x['hours_since_midnight'] = datetime_data.dt.hour + datetime_data.dt.minute / 60
         data_x = pd.concat([data_x, pd.DataFrame(OneHotEncoder(sparse_output=False).fit_transform(datetime_data.dt.weekday.to_frame()), columns=[f'weekday_{i}' for i in range(7)])], axis=1)
+        data_y = dataset.data.targets
         return data_x, data_y, data_x.shape[1], data_y.shape[1] if len(data_y.shape) > 1 else 1
 
 
@@ -76,6 +76,22 @@ class RTIoT2022(Dataset):
     """RT-IoT2022 (RT-IoT) dataset."""
     name = 'RT-IoT2022'
     id = 942
+    def load(self):
+        """Load RT-IoT2022 dataset."""
+        dataset = fetch_ucirepo(id=self.id)
+        data_x = dataset.data.features
+        proto_data = data_x['proto']
+        data_x.drop(columns=['proto'], inplace=True)
+        data_x = pd.concat([data_x, pd.DataFrame(OneHotEncoder(sparse_output=False).fit_transform(proto_data.to_frame()), columns=[f'proto_{i}' for i in range(proto_data.nunique())])], axis=1)
+        service_data = data_x['service']
+        data_x.drop(columns=['service'], inplace=True)
+        data_x = pd.concat([data_x, pd.DataFrame(OneHotEncoder(sparse_output=False).fit_transform(service_data.to_frame()), columns=[f'service_{i}' for i in range(service_data.nunique())])], axis=1)
+        data_y = dataset.data.targets
+        attack_type = data_y['Attack_type']
+        data_y.drop(columns=['Attack_type'], inplace=True)
+        #One hot encode attack type and concatenate with features
+        data_y = pd.concat([data_y, pd.DataFrame(OneHotEncoder(sparse_output=False).fit_transform(attack_type.to_frame()), columns=[f'attack_type_{i}' for i in range(attack_type.nunique())])], axis=1)
+        return data_x, data_y, data_x.shape[1], data_y.shape[1] if len(data_y.shape) > 1 else 1
 
 
 class ConcreteCompressiveStrength(Dataset):
@@ -84,21 +100,27 @@ class ConcreteCompressiveStrength(Dataset):
     id = 165
 
 
+class CombinedCyclePowerPlant(Dataset):
+    """Combined Cycle Power Plant dataset."""
+    name = 'Combined Cycle Power Plant'
+    id = 294
+
 # Dictionary mapping dataset names to classes
 DATASETS = {
-    'Red_Wine_Quality': WineQuality(wine_color='red'),
-    'White_Wine_Quality': WineQuality(wine_color='white'),
-    #'Appliances_Energy_Prediction': AppliancesEnergyPrediction, ## Removed for now due to large dataset size, loading issues, and poor fit for regression.
-    'RT-IoT2022': RTIoT2022,
-    'Concrete_Compressive_Strength': ConcreteCompressiveStrength,
+    'Red_Wine_Quality': lambda: WineQuality(wine_color='red'),
+    'White_Wine_Quality': lambda: WineQuality(wine_color='white'),
+    #'Appliances_Energy_Prediction': AppliancesEnergyPrediction(), ## Removed for now due to large dataset size, loading issues, and poor fit for regression.
+    #'RT-IoT2022': lambda: RTIoT2022(), ## Removed for now due to needing 3 OneHotEncoders which leads to NaN issues.
+    'Concrete_Compressive_Strength': lambda: ConcreteCompressiveStrength(),
+    'Combined_Cycle_Power_Plant': lambda: CombinedCyclePowerPlant(),
 }
 
 # Reverse mapping for ID lookup
-ID_TO_DATASET = {v.id: v for v in DATASETS.values()}
+ID_TO_DATASET = {v().id: v for v in DATASETS.values()}
 
 
 # For backwards compatibility with code that uses id_dict and data_pull_dict
-id_dict = {name: dataset_class.id for name, dataset_class in DATASETS.items()}
+id_dict = {name: dataset_class().id for name, dataset_class in DATASETS.items()}
 data_pull_dict = DATASETS
 
 

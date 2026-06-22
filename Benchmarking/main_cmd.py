@@ -7,10 +7,9 @@ from evaluations.plotters import run_plotting
 # Model combinations to test: (wrapper, model)
 MODEL_COMBINATIONS = [
     ("MVE_Ensemble_Averaged", "MVE_Default"),  # MEA-MD
-    ("MVE_Ensemble_Multiplicative", "MVE_Default"),  # MEM-MD
 ]
 
-DATASETS = ["Wine_Quality"]
+DATASETS = ["Concrete_Compressive_Strength"]  
 
 def parse_args():
     """Parse command line arguments."""
@@ -57,10 +56,11 @@ def run_training(combinations_to_run=None, use_best=None, dataset=None):
         # Use best argument. If --use-best is used and there is a path argument, it will use that path. 
         # If --use-best is used but there is no path argument, it will use the default best_parameters.json. 
         # If --use-best is not used, it will run optimization.
+        default_best_path = "best_params_and_all_results/best_parameters.json"
         if use_best is not None and isinstance(use_best, str):
             cmd.extend(["--use-best", use_best])
-        elif use_best is not None:
-            cmd.extend(["--use-best"])
+        elif use_best is None:
+            cmd.extend(["--use-best", default_best_path])
         else:
             cmd.append("--optimize")
 
@@ -105,10 +105,10 @@ def main():
         print("\nWorkflow failed during training phase.")
         sys.exit(1)
     
-    # Run plotting
-    run_plotting(pre=False)
+    
     
 
 
 if __name__ == "__main__":
     main()
+    run_plotting(paeesc=True)

@@ -6,7 +6,7 @@ import warnings
 from sklearn.preprocessing import StandardScaler, RobustScaler
 from sklearn.base import BaseEstimator, RegressorMixin
 
-torch.manual_seed(39)  # Set seed for reproducibility in training
+torch.manual_seed(82)  # Set seed for reproducibility in training
 warnings.filterwarnings('ignore', message='.*X has feature names.*')
 
 # Base model class

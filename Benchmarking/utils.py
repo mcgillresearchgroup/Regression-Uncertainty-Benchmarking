@@ -23,17 +23,7 @@ def parse_args():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  # Use individual hyperparameters
-  python train.py --dataset "Wine_Quality" --model "MVE_Default" --wrapper "MVE_Single" --epochs 50 --n-models 3
-  
-  # Use best parameters from previous runs
-  python train.py --dataset "Concrete Compressive Strength" --model "MLP_Default" --wrapper "MLP_Ensemble" --use-best
-  
-  # Run hyperparameter optimization with default 30 trials (optimized)
-  python train.py -d "Wine_Quality" -m "MVE_Default" -w "MVE_Ensemble_Averaged" --optimize
-  
-  # Run hyperparameter optimization with custom number of trials
-  python train.py -d "Wine_Quality" -m "MVE_Default" -w "MVE_Single" --optimize --n-trials 50
+  # Fix later
         """)
     
     parser.add_argument(
@@ -73,7 +63,13 @@ Examples:
         type=str,
         help='Use best parameters from previous optimization runs. Optionally specify a custom file path.'
     )
-    
+    parser.add_argument(
+        '-n_models',
+        type=int,
+        default=5,
+        help='Number of models to train (default: 5)'
+    )
+
     parser.add_argument(
         '--n-trials',
         type=int,

@@ -3,14 +3,14 @@
   "model": "MVE_Default",
   "wrapper": "MVE_Ensemble_Averaged",
   "timestamp": "20260615_092813",
-  "parameters": {
+  "hyperparameters": {
     "lr": 0.007229706435025275,
     "epochs": 100,
     "n_layers": 8,
     "layer_size": 88,
-    "dropout": 0.0,
-    "mean_head_dropout": 0.0,
-    "n_models": 5
+    "n_models": 5,
+    "mean_head_n_layers": null,
+    "mean_head_layer_size": null
   },
   "metrics": {
     "nll": 0.9120114541005695,

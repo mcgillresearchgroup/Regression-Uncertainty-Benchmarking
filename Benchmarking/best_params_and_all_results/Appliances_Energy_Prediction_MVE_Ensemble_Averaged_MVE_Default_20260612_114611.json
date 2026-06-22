@@ -3,7 +3,7 @@
   "model": "MVE_Default",
   "wrapper": "MVE_Ensemble_Averaged",
   "timestamp": "20260612_114611",
-  "parameters": {
+  "hyperparameters": {
     "lr": 0.001751103577844246,
     "epochs": 160,
     "n_layers": 6,

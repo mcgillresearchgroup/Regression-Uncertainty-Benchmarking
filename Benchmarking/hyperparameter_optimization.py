@@ -5,7 +5,7 @@ import numpy as np
 import optuna
 from optuna.pruners import MedianPruner
 from optuna.samplers import TPESampler
-from pathlib import Path
+from pathlib import Path, WindowsPath
 import gc
 import sys
 from sklearn.model_selection import KFold, train_test_split
@@ -14,7 +14,7 @@ from utils import negative_log_likelihood
 
 
 def create_model_wrapper(wrapper_class, base_model, num_features, num_targets, lr, epochs, 
-                        n_layers, layer_size, mean_head_n_layers, mean_head_layer_size, n_models=5, batch_size=32):
+                        n_layers, layer_size, mean_head_n_layers, mean_head_layer_size, n_models=5, batch_size=128):
     """Create a model wrapper instance with the specified parameters."""
     return wrapper_class(
         lr=lr,
@@ -150,7 +150,7 @@ def create_objective(X, y, wrapper_class, base_model,
 
 def run_hyperparameter_optimization(X, y, wrapper_class, 
                                    base_model, num_features, num_targets, 
-                                   verbose=False, batch_size=128, n_trials=4, use_kfold=True, n_splits=3):
+                                   verbose=False, batch_size=128, n_trials=4, use_kfold=True, n_splits=10):
     """Run optimized hyperparameter optimization.
     
     Args:
@@ -222,7 +222,7 @@ def save_best_parameters(best_params, dataset, wrapper_name, model_name, filepat
         "dataset": dataset,
         "wrapper": wrapper_name,
         "model": model_name,
-        "parameters": best_params
+        "hyperparameters": best_params
     }
     
     if best_nll is not None:
@@ -244,24 +244,26 @@ def load_best_parameters(dataset, wrapper_name, model_name, filepath=None):
     Returns the parameters dict, handling both old flat format and new nested format.
     """
     if filepath is None:
-        filepath = Path('results/best_parameters.json')
-    
+        filepath = Path('best_params_and_all_results/best_parameters.json')
+    else:
+        filepath = Path(filepath)
     if not filepath.exists():
+        print(f"No best parameters file found at {filepath}")
         return None
-    
+
     with open(filepath, 'r') as f:
         all_params = json.load(f)
-    
     key = f"{dataset}_{wrapper_name}_{model_name}"
     entry = all_params.get(key, None)
-    
+
     if entry is None:
+        print(f"No best parameters found for {key} in {filepath}")
         return None
     
     # Handle both old flat format and new nested format
-    if isinstance(entry, dict) and "parameters" in entry:
+    if isinstance(entry, dict) and "hyperparameters" in entry:
         # New nested format
-        return entry["parameters"]
+        return entry["hyperparameters"]
     else:
         # Old flat format
         return entry
