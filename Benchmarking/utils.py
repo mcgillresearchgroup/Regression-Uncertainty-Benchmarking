@@ -4,6 +4,7 @@ import numpy as np
 import pandas as pd
 from pathlib import Path
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
+import torch
 
 # Dictionaries of available datasets, models, and wrappers
 from data_dictionaries import load_dataset, data_pull_dict
@@ -87,7 +88,7 @@ Examples:
     parser.add_argument(
         '--seed',
         type=int,
-        default=42,
+        default=420,
         help='Random seed used if hyperparameter optimization is not run (default: 42)'
     )
     
@@ -201,3 +202,20 @@ def print_metrics(metrics):
     print(f"  RMSE: {metrics['rmse']:.6f}")
     print(f"  R²: {metrics['r2']:.6f}")
     print(f"  N Samples: {metrics['n_samples']}")
+
+
+def save_trained_model(model, save_dir, dataset_name, model_name, wrapper_name, seed):
+    save_dir = Path(save_dir)
+    save_dir.mkdir(exist_ok=True)
+    
+    timestamp = pd.Timestamp.now().strftime('%m%d_%H%M')
+    filename = save_dir / f"{dataset_name}_{wrapper_name}_{model_name}_{seed}_{timestamp}.pt"
+    
+    torch.save(model.get_save_state(), filename)
+    return filename
+
+
+def load_trained_model(filepath, map_location=None):
+    state = torch.load(filepath, map_location=map_location, weights_only=False)
+    wrapper_class, _ = wrapper_list_dict[state['wrapper_name']]
+    return wrapper_class.load_from_state(state)

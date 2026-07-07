@@ -3,6 +3,7 @@
 import sys
 import numpy as np
 import json
+import torch
 import pandas as pd
 from pathlib import Path
 from sklearn.model_selection import train_test_split
@@ -29,8 +30,11 @@ def main():
     """Main execution function."""
     args = parse_args()
     
-    # Set seed
+    # Set seeds robustly inside the child process for both NumPy and PyTorch
     np.random.seed(args.seed)
+    torch.manual_seed(args.seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(args.seed)
      
     if args.verbose:
         print(f"Configuration (OPTIMIZED):")
@@ -56,19 +60,16 @@ def main():
         print("Loading dataset...")
     
     X, y, num_features, num_targets = load_dataset(args.dataset)
-    print(f"Dataset loaded: {X.shape[0]} samples, {num_features} features, {num_targets} target(s)\n")
     if X is None:
         print("Failed to load dataset.")
         sys.exit(1)
-    
-    if args.verbose:
-        print(f"Dataset loaded: {X.shape[0]} samples, {num_features} features, {num_targets} target(s)\n")
+        
+    print(f"Dataset loaded: {X.shape[0]} samples, {num_features} features, {num_targets} target(s)\n")
     
     wrapper_class = wrapper_list_dict[args.wrapper][0]
     
     # Determine hyperparameters based on mode
     if args.optimize:
-        
         # Run hyperparameter optimization
         best_params, best_nll, _ = run_hyperparameter_optimization(
             X, y, wrapper_class, args.model, 
@@ -87,24 +88,16 @@ def main():
             'n_models': best_params.get('n_models', 5),
             'mean_head_n_layers': best_params.get('mean_head_n_layers', None),
             'mean_head_layer_size': best_params.get('mean_head_layer_size', None),
-            #batch size hp to be added (Currently defaulting to 256)
         }
         
     elif args.use_best is not None:
         # Try to load best parameters
-        print(args.use_best)
-        best_params = load_best_parameters(args.dataset, args.wrapper, args.model, filepath = args.use_best)
+        print(f"Loading best parameters from: {args.use_best}")
+        best_params = load_best_parameters(args.dataset, args.wrapper, args.model, filepath=args.use_best)
         print(f"best_params: {best_params}")
         params = best_params.get('hyperparameters', best_params)
         
         hp = {
-            #'lr': args.lr if args.lr != None else float(params['lr']),
-            #'epochs': args.epochs if args.epochs != None else int(params['epochs']),
-            #'n_layers': args.n_layers if args.n_layers != None else int(params['n_layers']),
-            #'layer_size': args.layer_size if args.layer_size != None else int(params['layer_size']),
-            #'n_models': args.n_models if args.n_models != None else int(params.get('n_models', 5)),
-            #'mean_head_n_layers': args.mean_head_n_layers if args.mean_head_n_layers != None else params.get('mean_head_n_layers', None),
-            #'mean_head_layer_size': args.mean_head_layer_size if args.mean_head_layer_size != None else params.get('mean_head_layer_size', None)
             'lr': float(params['lr']),
             'epochs': int(params['epochs']),
             'n_layers': int(params['n_layers']),
@@ -114,23 +107,19 @@ def main():
             'mean_head_layer_size': params.get('mean_head_layer_size', None)
         }
 
-
     # Create model wrapper with selected hyperparameters and run a cross validation training to get final metrics
     model_wrapper = create_model_wrapper(
         wrapper_class, args.model, num_features, num_targets,
         hp['lr'], hp['epochs'], hp['n_layers'], hp['layer_size'], 
-        hp['mean_head_n_layers'], hp['mean_head_layer_size'], hp['n_models'], batch_size=128
+        hp['mean_head_n_layers'], hp['mean_head_layer_size'], hp['n_models'], batch_size=128*4
     )
-    print(f"Batch Size: {128}")
+    print(f"Batch Size: {128*4}")
     cross_evaluation_folds = 10
     mean_pred, var_pred, y_true = model_wrapper.cross_validate(X, y, n_splits=cross_evaluation_folds)
 
     # Save results
     results_dir = Path('./best_params_and_all_results')
     filename, metrics, nll = save_results(results_dir, args.dataset, args.model, args.wrapper, mean_pred, var_pred, y_true, hyperparameters=hp)
-
-    # Note: Best parameters are saved during optimization in the optimized version
-    # No need to save again after training
      
     if args.verbose:
         print("Model Metrics:")

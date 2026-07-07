@@ -142,15 +142,8 @@ class Base_Model_Wrapper(ABC):
                     rmse_epoch_loss += torch.nn.functional.mse_loss(mean_pred.flatten(), y_batch.flatten()).item() * (batch_end - batch_start)
                 print(f"Model {model_idx + 1}/{self.n_models}, Epoch {epoch + 1}/{self.epochs}, RMSE Loss: {rmse_epoch_loss/n_samples:.4f}")
                 
-                if epoch > 0:
-                    rmse_loss_list.append(rmse_epoch_loss/n_samples)
-                    current_loss = rmse_epoch_loss / n_samples
-                if epoch >10:
-                    if all(current_loss >= 0.97 * loss for loss in rmse_loss_list[-20:]):
-                        print(f"Early stopping at epoch {epoch + 1} due to less than 3% improvement in RMSE loss over last 20 epochs.")
-                        training_early_stopped = True
-                if training_early_stopped:
-                    break    
+                # Early stopping here
+
             # Move model to CPU after training to free GPU memory
             model.cpu()
             if torch.cuda.is_available():
@@ -186,6 +179,40 @@ class Base_Model_Wrapper(ABC):
         y_true = np.concatenate(y_true, axis=0)
         
         return mean_pred, var_pred, y_true
+
+
+    def get_save_state(self):
+        return {
+            'wrapper_name': self.__class__.__name__,
+            'model_states': [m.state_dict() for m in self.model_set],
+            'x_scaler': self.x_scaler,
+            'y_scaler': self.y_scaler,
+            'hyperparams': {
+                'lr': self.lr,
+                'epochs': self.epochs,
+                'n_models': self.n_models,
+                'n_layers': self.n_layers,
+                'layer_size': self.layer_size,
+                'num_features': self.num_features,
+                'num_targets': self.num_targets,
+                'base_model': self.base_model,
+                'batch_size': self.batch_size,
+                'mean_head_n_layers': self.mean_head_n_layers,
+                'mean_head_layer_size': self.mean_head_layer_size,
+            }
+        }
+
+    @classmethod
+    def load_from_state(cls, state):
+        model = cls(**state['hyperparams'])
+        model.create_models()
+        for m, sd in zip(model.model_set, state['model_states']):
+            m.load_state_dict(sd)
+            m.eval()
+        model.x_scaler = state['x_scaler']
+        model.y_scaler = state['y_scaler']
+        return model
+
 
     @abstractmethod
     def predict(self, X):

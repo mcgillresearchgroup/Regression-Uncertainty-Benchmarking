@@ -8,7 +8,7 @@ from optuna.samplers import TPESampler
 from pathlib import Path, WindowsPath
 import gc
 import sys
-from sklearn.model_selection import KFold, train_test_split
+from sklearn.model_selection import KFold, RepeatedKFold, train_test_split
 from models_and_wrappers.model_wrappers import MVE_Single
 from utils import negative_log_likelihood
 
@@ -32,12 +32,14 @@ def create_model_wrapper(wrapper_class, base_model, num_features, num_targets, l
 
 
 def create_objective(X, y, wrapper_class, base_model, 
-                    num_features, num_targets, verbose=False, batch_size=128, use_kfold=True, n_splits=10):
+                    num_features, num_targets, verbose=False, batch_size=128, use_kfold=True, n_splits=10,
+                    n_repeats=1):
     """Create an Optuna objective function.
     
     Args:
         use_kfold: If True, use k-fold cross-validation on X_train/y_train instead of X_test/y_test (default: True)
         n_splits: Number of folds for cross-validation (default: 10)
+        n_repeats: Number of times to repeat the k-fold split with a different random seed each time (default: 1, i.e. plain KFold)
     """
     def objective(trial):
         # Suggest hyperparameters
@@ -61,12 +63,13 @@ def create_objective(X, y, wrapper_class, base_model,
         model = None
         try:
             if use_kfold:
-                # K-fold cross-validation on full dataset
-                kf = KFold(n_splits=n_splits, shuffle=True, random_state=44)
+                if n_repeats > 1:
+                    kf = RepeatedKFold(n_splits=n_splits, n_repeats=n_repeats, random_state=44)
+                else:
+                    kf = KFold(n_splits=n_splits, shuffle=True, random_state=44)
                 scores = []
                 
                 for fold_idx, (train_idx, val_idx) in enumerate(kf.split(X)):
-                    # Use .iloc for positional indexing with pandas DataFrames
                     if hasattr(X, 'iloc'):
                         X_tr, X_val = X.iloc[train_idx], X.iloc[val_idx]
                         y_tr, y_val = y.iloc[train_idx], y.iloc[val_idx]
@@ -150,7 +153,8 @@ def create_objective(X, y, wrapper_class, base_model,
 
 def run_hyperparameter_optimization(X, y, wrapper_class, 
                                    base_model, num_features, num_targets, 
-                                   verbose=False, batch_size=128, n_trials=4, use_kfold=True, n_splits=10):
+                                   verbose=False, batch_size=128, n_trials=4, use_kfold=True, n_splits=10,
+                                   n_repeats=1):
     """Run optimized hyperparameter optimization.
     
     Args:
@@ -158,6 +162,7 @@ def run_hyperparameter_optimization(X, y, wrapper_class,
         batch_size: Mini-batch size for training (default: 32)
         use_kfold: If True, use k-fold cross-validation instead of single train/test split (default: True)
         n_splits: Number of folds for cross-validation (default: 5)
+        n_repeats: Number of repeats for RepeatedKFold; use 1 for plain KFold (default: 1)
     """
     
     sampler = TPESampler(seed=43)
@@ -172,7 +177,7 @@ def run_hyperparameter_optimization(X, y, wrapper_class,
     objective = create_objective(
         X, y, wrapper_class, base_model,
         num_features, num_targets, verbose=verbose, batch_size=batch_size,
-        use_kfold=use_kfold, n_splits=n_splits
+        use_kfold=use_kfold, n_splits=n_splits, n_repeats=n_repeats
     )
     
     study.optimize(objective, n_trials=n_trials, show_progress_bar=not verbose)

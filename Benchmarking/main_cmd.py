@@ -2,75 +2,61 @@
 import subprocess
 import sys
 import argparse
-from evaluations.plotters import run_plotting
+import torch
+import numpy as np
+from evaluations.plotters_new import run_plotting
 
 # Model combinations to test: (wrapper, model)
 MODEL_COMBINATIONS = [
-    ("MVE_Ensemble_Averaged", "MVE_Default"),  # MEA-MD
+    ('MVE_Ensemble_Averaged', 'MVE_Default' ),  # MEA-MD
 ]
 
-DATASETS = ["Concrete_Compressive_Strength"]  
+DATASETS = ['Combined_Cycle_Power_Plant']  
+n = 35
+seed_list = [n, n+1, n+2, n+3, n+4]  # Seeds for reproducibility
 
 def parse_args():
     """Parse command line arguments."""
     parser = argparse.ArgumentParser(
         description='Train and compare model combinations'
     )
-    parser.add_argument(
-        '-c', '--combination',
-        type=int,
-        choices=range(1, len(MODEL_COMBINATIONS) + 1),
-        help=f'Run specific combination (1-{len(MODEL_COMBINATIONS)}). If not specified, runs all combinations.'
-    )
-    parser.add_argument(
-        '--dataset', '-d',
-        type=str,
-        choices=DATASETS,
-        default=DATASETS[0],
-        help=f'Dataset to use for training and evaluation (default: first dataset in dataset list: {DATASETS[0]})'
-    )
+
     parser.add_argument(
         '--use-best',
-        nargs='?',
-        const=None,
         type=str,
-        help='Use best hyperparameters from optimization. Provide path to JSON config file (e.g. results/best_parameters.json). If not specified, uses best_parameters.json.'
+        help='Use best hyperparameters from optimization. Provide path to JSON config file (e.g. best_params_and_all_results/best_parameters.json).'
+    )
+    parser.add_argument(
+        '--optimize',
+        action='store_true',
+        help='Force run hyperparameter optimization instead of using saved best parameters'
     )
     return parser.parse_args()
 
 
-def run_training(combinations_to_run=None, use_best=None, dataset=None):
+def run_training(combinations_to_run=None, use_best=None, optimize=False, dataset=None):
     """Run training for specified model combinations."""
     
-    for i, (wrapper, model), dataset_i in combinations_to_run:
-        print(f"\n[{i}/{len(MODEL_COMBINATIONS)}] Training {wrapper} with {model} on {DATASETS[dataset_i]}")
+    for i, (wrapper, model), dataset_i, seed in combinations_to_run:
+        print(f"\n[{i}/{len(combinations_to_run)}] Training {wrapper} with {model} on {DATASETS[dataset_i]}")
         print("-" * 80)
-        
+
+        # Build execution command
         cmd = [
             sys.executable, "train.py",
             "-d", DATASETS[dataset_i],
             "-m", model,
-            "-w", wrapper
+            "-w", wrapper,
+            "--seed", f"{seed + 102}"
         ]
 
-        # Use best argument. If --use-best is used and there is a path argument, it will use that path. 
-        # If --use-best is used but there is no path argument, it will use the default best_parameters.json. 
-        # If --use-best is not used, it will run optimization.
-        default_best_path = "best_params_and_all_results/best_parameters.json"
-        if use_best is not None and isinstance(use_best, str):
-            cmd.extend(["--use-best", use_best])
-        elif use_best is None:
-            cmd.extend(["--use-best", default_best_path])
-        else:
+        if optimize:
             cmd.append("--optimize")
-
-        # Dataset argument. If --dataset is used and there is a dataset argument, it will run on that dataset. 
-        # If --dataset is used but there is no dataset argument, it will run on the default dataset (the first one). 
-        # If --dataset is not used, it will run on all the datasets.
-        if dataset is not None and isinstance(dataset, str):
-            cmd.extend(["--dataset", dataset])
-        elif dataset is not None:
-            cmd.extend(["--dataset"])
+        else:
+            # If use_best was explicitly provided as a custom path, use it.
+            # Otherwise, default to the standard best parameters JSON file.
+            best_path = use_best if use_best is not None else "best_params_and_all_results/best_parameters.json"
+            cmd.extend(["--use-best", best_path])
 
         try:
             result = subprocess.run(cmd, check=True)
@@ -89,26 +75,20 @@ def main():
     args = parse_args()
     
     # Determine which combinations to run
-    if args.combination:
-        combinations_to_run = [(args.combination, MODEL_COMBINATIONS[args.combination - 1], 0)]
-    else:
-        combinations_to_run = [(i, combo, dataset_i) for i, combo in enumerate(MODEL_COMBINATIONS, 1) for dataset_i in range(len(DATASETS))]
+    combinations_to_run = [(i, combo, dataset_i, seed) for i, combo in enumerate(MODEL_COMBINATIONS, 1) for dataset_i in range(len(DATASETS)) for seed in seed_list]
     
     print("\nWorkflow Summary:")
     print(f"Dataset: {DATASETS[0]}")
     print(f"Model combinations to train: {len(combinations_to_run)}")
-    for idx, (wrapper, model), dataset_i in combinations_to_run:
-        print(f"  [{idx}] {wrapper} + {model} on {DATASETS[dataset_i]}")
-    
+    for idx, (wrapper, model), dataset_i, seed in combinations_to_run:
+        print(f"  [{idx}] {wrapper} + {model} on {DATASETS[dataset_i]} with seed {seed}")
+
     # Run training
-    if not run_training(combinations_to_run, use_best=args.use_best):
+    if not run_training(combinations_to_run, use_best=args.use_best, optimize=args.optimize):
         print("\nWorkflow failed during training phase.")
         sys.exit(1)
-    
-    
-    
 
 
 if __name__ == "__main__":
     main()
-    run_plotting(paeesc=True)
+    run_plotting(pms=True)
