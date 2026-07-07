@@ -2,62 +2,62 @@
 import subprocess
 import sys
 import argparse
+import torch
+import numpy as np
+from evaluations.plotters_new import run_plotting
 
 # Model combinations to test: (wrapper, model)
 MODEL_COMBINATIONS = [
-    ("MVE_Ensemble_Averaged", "MVE_Default"),  # MEA-MD
-    ("MVE_Ensemble_Averaged", "MVE_Mean_Head_Extension"),  # MEA-MH
-    ("MVE_Ensemble_Multiplicative", "MVE_Default"),  # MEM-MD
-    ("MVE_Ensemble_Multiplicative", "MVE_Mean_Head_Extension"),  # MEM-MH
+    ('MVE_Ensemble_Averaged', 'MVE_Default' ),  # MEA-MD
 ]
 
-DATASET = "Concrete Compressive Strength"
+DATASETS = ['Combined_Cycle_Power_Plant']  
+n = 35
+seed_list = [n, n+1, n+2, n+3, n+4]  # Seeds for reproducibility
 
 def parse_args():
     """Parse command line arguments."""
     parser = argparse.ArgumentParser(
         description='Train and compare model combinations'
     )
-    parser.add_argument(
-        '-c', '--combination',
-        type=int,
-        choices=range(1, len(MODEL_COMBINATIONS) + 1),
-        help=f'Run specific combination (1-{len(MODEL_COMBINATIONS)}). If not specified, runs all combinations.'
-    )
+
     parser.add_argument(
         '--use-best',
-        const=None,
         type=str,
-        help='Use best hyperparameters from optimization. Provide path to JSON config file (e.g. results/best_parameters.json). If not specified, runs optimization for each combination.'
+        help='Use best hyperparameters from optimization. Provide path to JSON config file (e.g. best_params_and_all_results/best_parameters.json).'
+    )
+    parser.add_argument(
+        '--optimize',
+        action='store_true',
+        help='Force run hyperparameter optimization instead of using saved best parameters'
     )
     return parser.parse_args()
 
- 
-def run_training(combinations_to_run=None, use_best=False):
+
+def run_training(combinations_to_run=None, use_best=None, optimize=False, dataset=None):
     """Run training for specified model combinations."""
-    if combinations_to_run is None:
-        combinations_to_run = [(i, combo) for i, combo in enumerate(MODEL_COMBINATIONS, 1)]
     
-    print("=" * 80)
-    print("Starting model training workflow (OPTIMIZED)")
-    print("=" * 80)
-    
-    for i, (wrapper, model) in combinations_to_run:
-        print(f"\n[{i}/{len(MODEL_COMBINATIONS)}] Training {wrapper} with {model}")
+    for i, (wrapper, model), dataset_i, seed in combinations_to_run:
+        print(f"\n[{i}/{len(combinations_to_run)}] Training {wrapper} with {model} on {DATASETS[dataset_i]}")
         print("-" * 80)
-        
+
+        # Build execution command
         cmd = [
             sys.executable, "train.py",
-            "-d", DATASET,
+            "-d", DATASETS[dataset_i],
             "-m", model,
-            "-w", wrapper
+            "-w", wrapper,
+            "--seed", f"{seed + 102}"
         ]
-        
-        if use_best is not None:
-            cmd.extend(["--use-best", use_best])
-        else:
+
+        if optimize:
             cmd.append("--optimize")
-        
+        else:
+            # If use_best was explicitly provided as a custom path, use it.
+            # Otherwise, default to the standard best parameters JSON file.
+            best_path = use_best if use_best is not None else "best_params_and_all_results/best_parameters.json"
+            cmd.extend(["--use-best", best_path])
+
         try:
             result = subprocess.run(cmd, check=True)
             if result.returncode != 0:
@@ -70,58 +70,25 @@ def run_training(combinations_to_run=None, use_best=False):
     return True
 
 
-def run_plotting():
-    """Generate comparison plots from trained models."""
-    print("\n" + "=" * 80)
-    print("Generating comparison plots")
-    print("=" * 80)
-    
-    cmd = [sys.executable, "./evaluations/plot_results.py"]
-    
-    try:
-        result = subprocess.run(cmd, check=True)
-        if result.returncode != 0:
-            print(f"Warning: Plotting command returned non-zero exit code: {result.returncode}")
-            return False
-    except subprocess.CalledProcessError as e:
-        print(f"Error: Plotting failed")
-        print(f"Exit code: {e.returncode}")
-        return False
-    
-    return True
-
-
 def main():
     """Execute the complete workflow."""
     args = parse_args()
     
     # Determine which combinations to run
-    if args.combination:
-        combinations_to_run = [(args.combination, MODEL_COMBINATIONS[args.combination - 1])]
-    else:
-        combinations_to_run = [(i, combo) for i, combo in enumerate(MODEL_COMBINATIONS, 1)]
+    combinations_to_run = [(i, combo, dataset_i, seed) for i, combo in enumerate(MODEL_COMBINATIONS, 1) for dataset_i in range(len(DATASETS)) for seed in seed_list]
     
     print("\nWorkflow Summary:")
-    print(f"Dataset: {DATASET}")
+    print(f"Dataset: {DATASETS[0]}")
     print(f"Model combinations to train: {len(combinations_to_run)}")
-    for idx, (wrapper, model) in combinations_to_run:
-        print(f"  [{idx}] {wrapper} + {model}")
-    
+    for idx, (wrapper, model), dataset_i, seed in combinations_to_run:
+        print(f"  [{idx}] {wrapper} + {model} on {DATASETS[dataset_i]} with seed {seed}")
+
     # Run training
-    if not run_training(combinations_to_run, use_best=args.use_best):
+    if not run_training(combinations_to_run, use_best=args.use_best, optimize=args.optimize):
         print("\nWorkflow failed during training phase.")
         sys.exit(1)
-    
-    # Only run plotting if doing all combinations
-    if not args.combination:
-        if not run_plotting():
-            print("\nWorkflow failed during plotting phase.")
-            sys.exit(1)
-    
-    print("\n" + "=" * 80)
-    print("Workflow completed successfully!")
-    print("=" * 80)
 
 
 if __name__ == "__main__":
     main()
+    run_plotting(pms=True)

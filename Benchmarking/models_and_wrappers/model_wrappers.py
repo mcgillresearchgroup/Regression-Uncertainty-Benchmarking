@@ -7,6 +7,7 @@ import warnings
 import gc
 from sklearn.preprocessing import StandardScaler, RobustScaler
 from sklearn.base import BaseEstimator, RegressorMixin
+from sklearn.model_selection import KFold
 from .base_model_list import base_model_list_dict
 from abc import ABC, abstractmethod
 
@@ -14,8 +15,7 @@ from abc import ABC, abstractmethod
 class Base_Model_Wrapper(ABC):
     output_variance = None  # To be set by subclasses
     def __init__(self, lr=0.001, epochs=100, n_models=5, n_layers=2, layer_size=64, 
-                 num_features=10, num_targets=1, dropout=0.1, mean_head_dropout=0.1, 
-                 base_model='MVE_Default', batch_size=None):
+                 num_features=10, num_targets=1, base_model='MVE_Default', batch_size=None, mean_head_n_layers=None, mean_head_layer_size=None):
         self.epochs = epochs
         self.lr = lr
         self.n_models = n_models
@@ -23,10 +23,10 @@ class Base_Model_Wrapper(ABC):
         self.layer_size = layer_size
         self.num_features = num_features
         self.num_targets = num_targets
-        self.dropout = dropout
-        self.mean_dropout = mean_head_dropout
         self.base_model = base_model
         self.batch_size = batch_size  # None = full batch, int = mini-batch size
+        self.mean_head_n_layers = mean_head_n_layers
+        self.mean_head_layer_size = mean_head_layer_size
         self.x_scaler = RobustScaler()
         self.y_scaler = RobustScaler()
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -85,15 +85,14 @@ class Base_Model_Wrapper(ABC):
         if not self.output_variance and model_has_variance:
             warnings.warn(f"{self.__class__.__name__} does not use variance, but {self.base_model} provides it")
         
-        # Create model list based on n_models
+        # Create model list based on n_models. If chosen model_class is MVE_Mean_Head_Extension, it will pass the additional hyperparameters for the mean head extension.
         self.model_set = []
         for _ in range(self.n_models):
-            if 'MLP' in self.base_model:
-                model = model_class(self.n_layers, self.layer_size, self.num_features, self.num_targets, self.dropout)
-            elif 'Mean_Head' in self.base_model:
-                model = model_class(self.n_layers, self.layer_size, self.num_features, self.num_targets, self.dropout, self.mean_dropout)
+            if model_class == 'MVE_Mean_Head_Extension':
+                model = model_class(self.n_layers, self.layer_size, self.num_features, self.num_targets, 
+                                    mean_head_n_layers=self.mean_head_n_layers, mean_head_layer_size=self.mean_head_layer_size)
             else:
-                model = model_class(self.n_layers, self.layer_size, self.num_features, self.num_targets, self.dropout)
+                model = model_class(self.n_layers, self.layer_size, self.num_features, self.num_targets)
             model = model.to(self.device)
             self.model_set.append(model)
 
@@ -116,10 +115,12 @@ class Base_Model_Wrapper(ABC):
             model.train()
             optimizer = torch.optim.Adam(model.parameters(), lr=self.lr)
             criterion = torch.nn.GaussianNLLLoss()
+            rmse_loss_list = []
+            training_early_stopped = False
 
             for epoch in range(self.epochs):
                 # Mini-batch training
-                epoch_loss = 0.0
+                rmse_epoch_loss = 0.0
                 for batch_start in range(0, n_samples, batch_size):
                     batch_end = min(batch_start + batch_size, n_samples)
                     X_batch = X_tensor[batch_start:batch_end]
@@ -134,33 +135,101 @@ class Base_Model_Wrapper(ABC):
                     else:
                         mean_pred = output
                         loss = torch.nn.functional.mse_loss(mean_pred.flatten(), y_batch.flatten())
-
+                        
                     optimizer.zero_grad()
                     loss.backward()
                     optimizer.step()
-                    epoch_loss += loss.item() * (batch_end - batch_start)
+                    rmse_epoch_loss += torch.nn.functional.mse_loss(mean_pred.flatten(), y_batch.flatten()).item() * (batch_end - batch_start)
+                print(f"Model {model_idx + 1}/{self.n_models}, Epoch {epoch + 1}/{self.epochs}, RMSE Loss: {rmse_epoch_loss/n_samples:.4f}")
                 
-                epoch_loss /= n_samples
-            
+                # Early stopping here
+
             # Move model to CPU after training to free GPU memory
             model.cpu()
             if torch.cuda.is_available():
                 torch.cuda.empty_cache()
             gc.collect()
 
+    def cross_validate(self, X, y, n_splits=10):
+        """Perform cross-validation and return metrics.
+        Inputs:
+            X: Input features
+            y: Target values
+            n_splits: Number of cross-validation folds
+        Returns:
+            mean_pred: Mean predictions across folds
+            var_pred: Variance predictions across folds (if output_variance == True: returns variance, else: returns None)"""
+        
+        kf = KFold(n_splits=n_splits, shuffle=True, random_state=67)
+        mean_preds = []
+        var_preds = []
+        y_true = []
+        for fold_idx, (train_idx, val_idx) in enumerate(kf.split(X)):
+            X_train, X_val = X.iloc[train_idx], X.iloc[val_idx]
+            y_train, y_val = y.iloc[train_idx], y.iloc[val_idx]
+            
+            self.fit(X_train, y_train)
+            mean_pred, var_pred = self.predict(X_val)
+            mean_preds.append(mean_pred)
+            var_preds.append(var_pred)
+            y_true.append(y_val)
+
+        mean_pred = np.concatenate(mean_preds, axis=0)
+        var_pred = np.concatenate(var_preds, axis=0) if self.output_variance else None
+        y_true = np.concatenate(y_true, axis=0)
+        
+        return mean_pred, var_pred, y_true
+
+
+    def get_save_state(self):
+        return {
+            'wrapper_name': self.__class__.__name__,
+            'model_states': [m.state_dict() for m in self.model_set],
+            'x_scaler': self.x_scaler,
+            'y_scaler': self.y_scaler,
+            'hyperparams': {
+                'lr': self.lr,
+                'epochs': self.epochs,
+                'n_models': self.n_models,
+                'n_layers': self.n_layers,
+                'layer_size': self.layer_size,
+                'num_features': self.num_features,
+                'num_targets': self.num_targets,
+                'base_model': self.base_model,
+                'batch_size': self.batch_size,
+                'mean_head_n_layers': self.mean_head_n_layers,
+                'mean_head_layer_size': self.mean_head_layer_size,
+            }
+        }
+
+    @classmethod
+    def load_from_state(cls, state):
+        model = cls(**state['hyperparams'])
+        model.create_models()
+        for m, sd in zip(model.model_set, state['model_states']):
+            m.load_state_dict(sd)
+            m.eval()
+        model.x_scaler = state['x_scaler']
+        model.y_scaler = state['y_scaler']
+        return model
+
+
     @abstractmethod
     def predict(self, X):
+        '''Predict method to be implemented by subclasses.
+        Input:
+            X: Input features for prediction
+        Returns:
+            Predictions (mean and log(var) if output_variance == True, else mean only)'''
         pass
 
 
 class MVE_Ensemble_Averaged(Base_Model_Wrapper):
     output_variance = True
     def __init__(self, lr=0.001, epochs=100, n_models=5, n_layers=2, layer_size=64, 
-                 num_features=10, num_targets=1, dropout=0.0, mean_head_dropout=0.0, 
-                 base_model='MVE_Default', batch_size=None):
-        super().__init__(lr, epochs, n_models, n_layers, layer_size, num_features, num_targets, 
-                        dropout, mean_head_dropout, base_model, batch_size)
-
+                 num_features=10, num_targets=1, base_model='MVE_Default', batch_size=None, mean_head_n_layers=None, mean_head_layer_size=None):
+        super().__init__(lr, epochs, n_models, n_layers, layer_size, 
+                        num_features, num_targets, base_model, batch_size, mean_head_n_layers, mean_head_layer_size)
     def predict(self, X):
         X = np.asarray(X, dtype=np.float32)
         self.data_check(X=X)
@@ -196,7 +265,7 @@ class MVE_Ensemble_Averaged(Base_Model_Wrapper):
         
         # Inverse transform
         preds_mean_unscaled = self.y_scaler.inverse_transform(preds_mean_reshaped)
-        preds_var_unscaled = np.exp(preds_var_reshaped) * (self.y_scaler.scale_ ** 2)
+        preds_var_unscaled = preds_var_reshaped * (self.y_scaler.scale_ ** 2)
         
         # Reshape back
         preds_mean_unscaled = preds_mean_unscaled.reshape(n_models, n_samples, n_targets)
@@ -206,19 +275,19 @@ class MVE_Ensemble_Averaged(Base_Model_Wrapper):
         mean_ensemble = preds_mean_unscaled.mean(axis=0)
         aleatoric_var = preds_var_unscaled.mean(axis=0)
         epistemic_var = preds_mean_unscaled.var(axis=0)
-        var_ensemble = aleatoric_var + epistemic_var
-
+        if n_models == 1:
+            var_ensemble = aleatoric_var
+        else:
+            var_ensemble = aleatoric_var + epistemic_var
         return mean_ensemble, var_ensemble
 
 
 class MLP_Ensemble(Base_Model_Wrapper):
     output_variance = False
     def __init__(self, lr=0.001, epochs=100, n_models=5, n_layers=2, layer_size=64, 
-                 num_features=10, num_targets=1, dropout=0.0, mean_head_dropout=0.0, 
-                 base_model='MLP_Default', batch_size=None):
-        super().__init__(lr, epochs, n_models, n_layers, layer_size, num_features, num_targets, 
-                        dropout, mean_head_dropout=mean_head_dropout, base_model=base_model, batch_size=batch_size)
-
+                 num_features=10, num_targets=1, base_model='MLP_Default', batch_size=None, mean_head_n_layers=None, mean_head_layer_size=None):
+        super().__init__(lr, epochs, n_models, n_layers, layer_size, 
+                        num_features, num_targets, base_model, batch_size, mean_head_n_layers, mean_head_layer_size)
     def predict(self, X):
         X = np.asarray(X, dtype=np.float32)
         self.data_check(X=X)
@@ -258,16 +327,22 @@ class MLP_Ensemble(Base_Model_Wrapper):
 
 class MVE_Single(MVE_Ensemble_Averaged):
     """Single MVE model (n_models=1)."""
-    def __init__(self, lr=0.001, epochs=100, n_layers=2, layer_size=64, num_features=10, 
-                 num_targets=1, dropout=0.0, mean_head_dropout=0.0, base_model='MVE_Default', batch_size=None):
-        super().__init__(lr, epochs, n_models=1, n_layers=n_layers, layer_size=layer_size, 
-                        num_features=num_features, num_targets=num_targets, 
-                        dropout=dropout, mean_head_dropout=mean_head_dropout, 
-                        base_model=base_model, batch_size=batch_size)
+    output_variance = True
+    def __init__(self, lr=0.001, epochs=100, n_layers=2, layer_size=64, 
+             num_features=10, num_targets=1, base_model='MVE_Default', batch_size=None, mean_head_n_layers=None, mean_head_layer_size=None):
+        super().__init__(lr, epochs, n_layers, layer_size, num_features, num_targets, base_model, batch_size, mean_head_n_layers, mean_head_layer_size, n_models=1)
+    def predict(self, X):
+        mean, var = super().predict(X)
+        return mean, var
 
 
 class MVE_Ensemble_Multiplicative(MVE_Ensemble_Averaged):
-    """Ensemble using geometric mean aggregation."""
+    """Ensemble using multiplicative aggregation."""
+    output_variance = True
+    def __init__(self, lr=0.001, epochs=100, n_models=5, n_layers=2, layer_size=64, 
+                 num_features=10, num_targets=1, base_model='MVE_Default', batch_size=None, mean_head_n_layers=None, mean_head_layer_size=None):
+        super().__init__(lr, epochs, n_models, n_layers, layer_size, 
+                        num_features, num_targets, base_model, batch_size, mean_head_n_layers, mean_head_layer_size)
     def predict(self, X):
         X = np.asarray(X, dtype=np.float32)
         self.data_check(X=X)
