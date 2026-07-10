@@ -3,6 +3,7 @@ from ucimlrepo import fetch_ucirepo
 import pandas as pd
 from abc import ABC, abstractmethod
 import datetime as dt
+import openml as om
 
 class Dataset(ABC):
     """Base class for datasets."""

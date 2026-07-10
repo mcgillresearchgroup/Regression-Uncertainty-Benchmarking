@@ -8,12 +8,12 @@ import torch
 
 # Dictionaries of available datasets, models, and wrappers
 from data_dictionaries import load_dataset, data_pull_dict
-from models_and_wrappers.base_model_list import base_model_list_dict
+from Benchmarking.models_and_wrappers.base_list import base_list_dict
 from models_and_wrappers.model_wrappers import wrapper_list_dict
 
 # Available options
 DATASETS = list(data_pull_dict.keys())
-MODELS = list(base_model_list_dict.keys())
+BASES = list(base_list_dict.keys())
 WRAPPERS = list(wrapper_list_dict.keys())
 
 
@@ -39,8 +39,8 @@ Examples:
         '-m', '--model',
         type=str,
         required=True,
-        choices=MODELS,
-        help=f'Base model architecture. Options: {", ".join(MODELS)}'
+        choices=BASES,
+        help=f'Base architecture. Options: {", ".join(BASES)}'
     )
     
     parser.add_argument(
@@ -65,7 +65,7 @@ Examples:
         help='Use best parameters from previous optimization runs. Optionally specify a custom file path.'
     )
     parser.add_argument(
-        '-n_models',
+        '--n_models',
         type=int,
         default=5,
         help='Number of models to train (default: 5)'
@@ -99,6 +99,19 @@ Examples:
     )
     
     return parser.parse_args()
+
+
+def data_check(self, X=None, y=None):
+    if X is not None:
+        if np.isnan(X).any():
+            raise ValueError("NaN detected in input X.")
+        if not np.isfinite(X).all():
+            raise ValueError("Inf detected in input X.")
+    if y is not None:
+        if np.isnan(y).any():
+            raise ValueError("NaN detected in input y.")
+        if not np.isfinite(y).all():
+            raise ValueError("Inf detected in input y.")
 
 
 def get_model_label(wrapper, model):
@@ -145,7 +158,7 @@ def negative_log_likelihood(y_true, y_pred_mean, y_pred_var, eps=1e-6):
     return np.mean(nll)
 
 # Add in the saving of the params used in the save results function, so that we can easily track which hyperparameters were used for each result file.
-def save_results(results_dir, dataset_name, model_name, wrapper_name, mean_pred, var_pred, y_test, hyperparameters=None):
+def save_results(results_dir, dataset_name, wrapper_name, base_name, mean_pred, var_pred, y_test, hyperparameters=None):
     """Save model predictions and metrics to file."""
     results_dir = Path(results_dir)
     results_dir.mkdir(exist_ok=True)
@@ -163,12 +176,12 @@ def save_results(results_dir, dataset_name, model_name, wrapper_name, mean_pred,
     y_true_list = y_true_array.tolist()
     # Create filename
     timestamp = pd.Timestamp.now().strftime('%Y%m%d_%H%M%S')
-    filename = results_dir / f"{dataset_name}_{wrapper_name}_{model_name}_{timestamp}.json"
+    filename = results_dir / f"{dataset_name}_{wrapper_name}_{base_name}_{timestamp}.json"
     
     # Prepare results
     results = {
         'dataset': dataset_name,
-        'model': model_name,
+        'base': base_name,
         'wrapper': wrapper_name,
         'timestamp': timestamp,
         'hyperparameters': {hyper: value for hyper, value in (hyperparameters or {}).items()},
@@ -192,6 +205,12 @@ def save_results(results_dir, dataset_name, model_name, wrapper_name, mean_pred,
         json.dump(results, f, indent=2)
     
     return filename, results['metrics'], nll
+    
+    # Save to file
+    with open(filename, 'w') as f:
+        json.dump(results, f, indent=2)
+    
+    return filename, results['metrics'], nll
 
 
 def print_metrics(metrics):
@@ -204,14 +223,14 @@ def print_metrics(metrics):
     print(f"  N Samples: {metrics['n_samples']}")
 
 
-def save_trained_model(model, save_dir, dataset_name, model_name, wrapper_name, seed):
+def save_trained_model(wrapper, save_dir, dataset_name, wrapper_name, base_name, seed):
     save_dir = Path(save_dir)
     save_dir.mkdir(exist_ok=True)
     
     timestamp = pd.Timestamp.now().strftime('%m%d_%H%M')
-    filename = save_dir / f"{dataset_name}_{wrapper_name}_{model_name}_{seed}_{timestamp}.pt"
+    filename = save_dir / f"{dataset_name}_{wrapper_name}_{base_name}_{seed}_{timestamp}.pt"
     
-    torch.save(model.get_save_state(), filename)
+    torch.save(wrapper.get_save_state(), filename)
     return filename
 
 
