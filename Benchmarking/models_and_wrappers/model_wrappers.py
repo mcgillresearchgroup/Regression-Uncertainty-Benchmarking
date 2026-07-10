@@ -8,14 +8,18 @@ import gc
 from sklearn.preprocessing import StandardScaler, RobustScaler
 from sklearn.base import BaseEstimator, RegressorMixin
 from sklearn.model_selection import KFold
-from .base_model_list import base_model_list_dict
+from .base_list import MVE_Mean_Head_Extension, base_list_dict
 from abc import ABC, abstractmethod
+from utils import data_check
 
 
-class Base_Model_Wrapper(ABC):
-    output_variance = None  # To be set by subclasses
-    def __init__(self, lr=0.001, epochs=100, n_models=5, n_layers=2, layer_size=64, 
-                 num_features=10, num_targets=1, base_model='MVE_Default', batch_size=None, mean_head_n_layers=None, mean_head_layer_size=None):
+class Default_Wrapper(ABC):
+    default_base = 'MVE_Default'   # set by subclasses if they differ
+
+    def __init__(self, lr=0.001, epochs=100, n_models=5, n_layers=2, layer_size=64,
+                 num_features=10, num_targets=1, base=None, batch_size=None,
+                 mean_head_n_layers=None, mean_head_layer_size=None):
+        
         self.epochs = epochs
         self.lr = lr
         self.n_models = n_models
@@ -23,26 +27,13 @@ class Base_Model_Wrapper(ABC):
         self.layer_size = layer_size
         self.num_features = num_features
         self.num_targets = num_targets
-        self.base_model = base_model
+        self.base_class = base if base is not None else self.default_base
         self.batch_size = batch_size  # None = full batch, int = mini-batch size
         self.mean_head_n_layers = mean_head_n_layers
         self.mean_head_layer_size = mean_head_layer_size
         self.x_scaler = RobustScaler()
         self.y_scaler = RobustScaler()
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-
-    #NaN and Inf check for input data
-    def data_check(self, X=None, y=None):
-        if X is not None:
-            if np.isnan(X).any():
-                raise ValueError("NaN detected in input X.")
-            if not np.isfinite(X).all():
-                raise ValueError("Inf detected in input X.")
-        if y is not None:
-            if np.isnan(y).any():
-                raise ValueError("NaN detected in input y.")
-            if not np.isfinite(y).all():
-                raise ValueError("Inf detected in input y.")
 
 
     def fit(self, X, y):
@@ -54,7 +45,7 @@ class Base_Model_Wrapper(ABC):
             self: Fitted model instance"""
         X = np.asarray(X, dtype=np.float32)
         y = np.asarray(y, dtype=np.float32).reshape(-1, 1) if y.ndim == 1 else np.asarray(y, dtype=np.float32)
-        self.data_check(X=X, y=y)
+        data_check(X=X, y=y)
 
         #scaling and converting to tensors
         self.num_features = X.shape[1]
@@ -76,23 +67,15 @@ class Base_Model_Wrapper(ABC):
         Returns:
             self.model_set: List of model instances"""
         
-        # Warnings and Value Errors for incompatible base models and wrappers.
-        if self.base_model not in base_model_list_dict:
-            raise ValueError(f"Base model '{self.base_model}' not found in base_model_list_dict")
-        model_class, model_has_variance = base_model_list_dict[self.base_model]
-        if self.output_variance and not model_has_variance:
-            raise ValueError(f"{self.__class__.__name__} requires variance output, but {self.base_model} does not provide it")
-        if not self.output_variance and model_has_variance:
-            warnings.warn(f"{self.__class__.__name__} does not use variance, but {self.base_model} provides it")
         
         # Create model list based on n_models. If chosen model_class is MVE_Mean_Head_Extension, it will pass the additional hyperparameters for the mean head extension.
         self.model_set = []
         for _ in range(self.n_models):
-            if model_class == 'MVE_Mean_Head_Extension':
-                model = model_class(self.n_layers, self.layer_size, self.num_features, self.num_targets, 
+            if self.base_class == MVE_Mean_Head_Extension:
+                model = self.base_class(self.n_layers, self.layer_size, self.num_features, self.num_targets, 
                                     mean_head_n_layers=self.mean_head_n_layers, mean_head_layer_size=self.mean_head_layer_size)
             else:
-                model = model_class(self.n_layers, self.layer_size, self.num_features, self.num_targets)
+                model = self.base_class(self.n_layers, self.layer_size, self.num_features, self.num_targets)
             model = model.to(self.device)
             self.model_set.append(model)
 
@@ -179,32 +162,49 @@ class Base_Model_Wrapper(ABC):
         y_true = np.concatenate(y_true, axis=0)
         
         return mean_pred, var_pred, y_true
-
+    
+    def get_wrapper_specific_params(self):
+        return {
+            'lr': self.lr,
+            'epochs': self.epochs,
+            'n_models': self.n_models,
+            'n_layers': self.n_layers,
+            'layer_size': self.layer_size,
+            'batch_size': self.batch_size,
+        }
 
     def get_save_state(self):
+        hyperparams = self.get_wrapper_specific_params()
+        hyperparams.update(self.model_set[0].get_base_specific_params())
         return {
             'wrapper_name': self.__class__.__name__,
+            'base': self.base,
+            'num_features': self.num_features,
+            'num_targets': self.num_targets,
             'model_states': [m.state_dict() for m in self.model_set],
             'x_scaler': self.x_scaler,
             'y_scaler': self.y_scaler,
-            'hyperparams': {
-                'lr': self.lr,
-                'epochs': self.epochs,
-                'n_models': self.n_models,
-                'n_layers': self.n_layers,
-                'layer_size': self.layer_size,
-                'num_features': self.num_features,
-                'num_targets': self.num_targets,
-                'base_model': self.base_model,
-                'batch_size': self.batch_size,
-                'mean_head_n_layers': self.mean_head_n_layers,
-                'mean_head_layer_size': self.mean_head_layer_size,
-            }
+            'hyperparams': hyperparams,
+        }
+    
+    @classmethod
+    def suggest_specific_params(cls, trial):
+        return {
+            'lr': trial.suggest_float('lr', 1e-5, 1e-2, log=True),
+            'epochs': trial.suggest_int('epochs', 20, 200, step=20),
+            'n_layers': trial.suggest_int('n_layers', 2, 8),
+            'layer_size': trial.suggest_int('layer_size', 16, 120, step=8),
+            'n_models': trial.suggest_categorical('n_models', [5])
         }
 
     @classmethod
     def load_from_state(cls, state):
-        model = cls(**state['hyperparams'])
+        model = cls(
+            base=state['base'],
+            num_features=state['num_features'],
+            num_targets=state['num_targets'],
+            **state['hyperparams']
+        )
         model.create_models()
         for m, sd in zip(model.model_set, state['model_states']):
             m.load_state_dict(sd)
@@ -212,7 +212,6 @@ class Base_Model_Wrapper(ABC):
         model.x_scaler = state['x_scaler']
         model.y_scaler = state['y_scaler']
         return model
-
 
     @abstractmethod
     def predict(self, X):
@@ -224,15 +223,11 @@ class Base_Model_Wrapper(ABC):
         pass
 
 
-class MVE_Ensemble_Averaged(Base_Model_Wrapper):
-    output_variance = True
-    def __init__(self, lr=0.001, epochs=100, n_models=5, n_layers=2, layer_size=64, 
-                 num_features=10, num_targets=1, base_model='MVE_Default', batch_size=None, mean_head_n_layers=None, mean_head_layer_size=None):
-        super().__init__(lr, epochs, n_models, n_layers, layer_size, 
-                        num_features, num_targets, base_model, batch_size, mean_head_n_layers, mean_head_layer_size)
+class MVE_Ensemble_Averaged(Default_Wrapper):
+
     def predict(self, X):
         X = np.asarray(X, dtype=np.float32)
-        self.data_check(X=X)
+        data_check(X=X)
         
         X_scaled = self.x_scaler.transform(X)
         X_tensor = torch.from_numpy(X_scaled).float()
@@ -282,15 +277,12 @@ class MVE_Ensemble_Averaged(Base_Model_Wrapper):
         return mean_ensemble, var_ensemble
 
 
-class MLP_Ensemble(Base_Model_Wrapper):
-    output_variance = False
-    def __init__(self, lr=0.001, epochs=100, n_models=5, n_layers=2, layer_size=64, 
-                 num_features=10, num_targets=1, base_model='MLP_Default', batch_size=None, mean_head_n_layers=None, mean_head_layer_size=None):
-        super().__init__(lr, epochs, n_models, n_layers, layer_size, 
-                        num_features, num_targets, base_model, batch_size, mean_head_n_layers, mean_head_layer_size)
+class MLP_Ensemble(Default_Wrapper):
+    default_base = 'MLP_Default'
+
     def predict(self, X):
         X = np.asarray(X, dtype=np.float32)
-        self.data_check(X=X)
+        data_check(X=X)
         
         X_scaled = self.x_scaler.transform(X)
         X_tensor = torch.from_numpy(X_scaled).float()
@@ -325,27 +317,12 @@ class MLP_Ensemble(Base_Model_Wrapper):
         return mean_ensemble, var_ensemble
 
 
-class MVE_Single(MVE_Ensemble_Averaged):
-    """Single MVE model (n_models=1)."""
-    output_variance = True
-    def __init__(self, lr=0.001, epochs=100, n_layers=2, layer_size=64, 
-             num_features=10, num_targets=1, base_model='MVE_Default', batch_size=None, mean_head_n_layers=None, mean_head_layer_size=None):
-        super().__init__(lr, epochs, n_layers, layer_size, num_features, num_targets, base_model, batch_size, mean_head_n_layers, mean_head_layer_size, n_models=1)
-    def predict(self, X):
-        mean, var = super().predict(X)
-        return mean, var
-
-
-class MVE_Ensemble_Multiplicative(MVE_Ensemble_Averaged):
+class MVE_Ensemble_Multiplicative(Default_Wrapper):
     """Ensemble using multiplicative aggregation."""
-    output_variance = True
-    def __init__(self, lr=0.001, epochs=100, n_models=5, n_layers=2, layer_size=64, 
-                 num_features=10, num_targets=1, base_model='MVE_Default', batch_size=None, mean_head_n_layers=None, mean_head_layer_size=None):
-        super().__init__(lr, epochs, n_models, n_layers, layer_size, 
-                        num_features, num_targets, base_model, batch_size, mean_head_n_layers, mean_head_layer_size)
+
     def predict(self, X):
         X = np.asarray(X, dtype=np.float32)
-        self.data_check(X=X)
+        data_check(X=X)
         
         X_scaled = self.x_scaler.transform(X)
         X_tensor = torch.from_numpy(X_scaled).float()
@@ -400,7 +377,6 @@ class MVE_Ensemble_Multiplicative(MVE_Ensemble_Averaged):
 # Dictionary of model wrappers. The boolean indicates whether the wrapper requires variance output from the base model.
 wrapper_list_dict = {
     'MVE_Ensemble_Averaged': [MVE_Ensemble_Averaged, True],
-    'MVE_Single': [MVE_Single, True],
     'MLP_Ensemble': [MLP_Ensemble, False],
     'MVE_Ensemble_Multiplicative': [MVE_Ensemble_Multiplicative, True]
 }

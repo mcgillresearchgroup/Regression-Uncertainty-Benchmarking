@@ -8,6 +8,7 @@ import pandas as pd
 from pathlib import Path
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
+from yaml import warnings
 from utils import (
     parse_args, 
     load_dataset, 
@@ -16,7 +17,7 @@ from utils import (
     negative_log_likelihood, 
     get_model_label,
     wrapper_list_dict,
-    base_model_list_dict
+    base_list_dict
 )
 from hyperparameter_optimization import (
     create_model_wrapper, 
@@ -39,7 +40,7 @@ def main():
     if args.verbose:
         print(f"Configuration (OPTIMIZED):")
         print(f"  Dataset: {args.dataset}")
-        print(f"  Model: {args.model}")
+        print(f"  Base: {args.base}")
         print(f"  Wrapper: {args.wrapper}")
         if args.optimize:
             print(f"  Mode: Hyperparameter Optimization (Optimized: 30 trials with pruning)")
@@ -65,20 +66,30 @@ def main():
         sys.exit(1)
         
     print(f"Dataset loaded: {X.shape[0]} samples, {num_features} features, {num_targets} target(s)\n")
-    
-    wrapper_class = wrapper_list_dict[args.wrapper][0]
-    
+
+    if args.base not in base_list_dict:
+        raise ValueError(f"Base '{args.base}' not found in base_list_dict")
+    if args.wrapper not in wrapper_list_dict:
+        raise ValueError(f"Wrapper '{args.wrapper}' not found in wrapper_list_dict")
+    wrapper_class, wrapper_has_variance = wrapper_list_dict[args.wrapper]
+    base_class, base_has_variance = base_list_dict[args.base]
+    if wrapper_has_variance and not base_has_variance:
+        raise ValueError(f"{args.wrapper} requires variance output, but {args.base} does not provide it")
+    if not wrapper_has_variance and base_has_variance:
+        warnings.warn(f"{args.wrapper} does not use variance, but {args.base} provides it")
+
+
     # Determine hyperparameters based on mode
     if args.optimize:
         # Run hyperparameter optimization
         best_params, best_nll, _ = run_hyperparameter_optimization(
-            X, y, wrapper_class, args.model, 
+            X, y, wrapper_class, base_class,
             num_features, num_targets,
             n_trials=args.n_trials, verbose=args.verbose, batch_size=128, use_kfold=True, n_splits=10
         )
         
         # Save best parameters
-        save_best_parameters(best_params, args.dataset, args.wrapper, args.model, best_nll=best_nll)
+        save_best_parameters(best_params, args.dataset, args.wrapper, args.base, best_nll=best_nll)
         
         hp = {
             'lr': best_params['lr'],
@@ -93,7 +104,7 @@ def main():
     elif args.use_best is not None:
         # Try to load best parameters
         print(f"Loading best parameters from: {args.use_best}")
-        best_params = load_best_parameters(args.dataset, args.wrapper, args.model, filepath=args.use_best)
+        best_params = load_best_parameters(args.dataset, args.wrapper, args.base, filepath=args.use_best)
         print(f"best_params: {best_params}")
         params = best_params.get('hyperparameters', best_params)
         
@@ -109,7 +120,7 @@ def main():
 
     # Create model wrapper with selected hyperparameters and run a cross validation training to get final metrics
     model_wrapper = create_model_wrapper(
-        wrapper_class, args.model, num_features, num_targets,
+        wrapper_class, base_class, num_features, num_targets,
         hp['lr'], hp['epochs'], hp['n_layers'], hp['layer_size'], 
         hp['mean_head_n_layers'], hp['mean_head_layer_size'], hp['n_models'], batch_size=128*4
     )
@@ -119,7 +130,7 @@ def main():
 
     # Save results
     results_dir = Path('./best_params_and_all_results')
-    filename, metrics, nll = save_results(results_dir, args.dataset, args.model, args.wrapper, mean_pred, var_pred, y_true, hyperparameters=hp)
+    filename, metrics, nll = save_results(results_dir, args.dataset, args.wrapper, args.base, mean_pred, var_pred, y_true, hyperparameters=hp)
      
     if args.verbose:
         print("Model Metrics:")
@@ -127,7 +138,7 @@ def main():
         print(f"\nResults saved to: {filename}\n")
     
     # Print summary with clean labeling
-    model_label = get_model_label(args.wrapper, args.model)
+    model_label = get_model_label(args.wrapper, args.base)
     print(f"Training complete for: {model_label}")
     print(f"NLL: {metrics['nll']:.6f}")
     print(f"Saved to: {filename}")

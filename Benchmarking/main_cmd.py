@@ -2,8 +2,6 @@
 import subprocess
 import sys
 import argparse
-import torch
-import numpy as np
 from evaluations.plotters_new import run_plotting
 
 # Model combinations to test: (wrapper, model)

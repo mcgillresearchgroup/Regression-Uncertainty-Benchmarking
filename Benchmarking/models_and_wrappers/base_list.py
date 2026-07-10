@@ -10,7 +10,7 @@ torch.manual_seed(82)  # Set seed for reproducibility in training
 warnings.filterwarnings('ignore', message='.*X has feature names.*')
 
 # Base model class
-class BaseModel(nn.Module):
+class Default_Base(nn.Module):
     def __init__(self, n_layers, layer_size, num_features, num_targets = 1, dropout=0.0):
         super().__init__()
         self.n_layers = n_layers
@@ -20,7 +20,6 @@ class BaseModel(nn.Module):
         self.size_in = num_features
         self.dropout = dropout
     
-    # Default architecture
     def module_sequence_body(self):
         self.module_sequence_body_list = nn.ModuleList()
         for i in range(self.n_layers - 1):
@@ -32,12 +31,19 @@ class BaseModel(nn.Module):
     def module_sequence_head(self):
         pass
 
+    def get_base_specific_params(self):
+        return {}
+    
+    @classmethod
+    def suggest_specific_params(cls, trial):
+        return {}
+
     @abstractmethod
     def forward(self, x):
         pass
 
 
-class MVE_Default(BaseModel):
+class MVE_Default(Default_Base):
     def __init__(self, n_layers, layer_size, num_features, num_targets):
         super().__init__(n_layers, layer_size, num_features, num_targets)
         self.module_sequence_body()
@@ -55,7 +61,7 @@ class MVE_Default(BaseModel):
         return mean, var
     
     
-class MVE_Mean_Head_Extension(BaseModel):
+class MVE_Mean_Head_Extension(Default_Base):
     def __init__(self, n_layers, layer_size, num_features, num_targets, mean_head_n_layers=2, mean_head_layer_size=None):
         super().__init__(n_layers, layer_size, num_features, num_targets)
         self.mean_head_n_layers = mean_head_n_layers
@@ -75,7 +81,20 @@ class MVE_Mean_Head_Extension(BaseModel):
         # Final output heads
         self.mean_head = nn.Linear(self.size_in, self.num_targets)
         self.var_head = nn.Linear(self.size_in, self.num_targets)
-        
+
+    def get_base_specific_params(self):
+        return {
+            'mean_head_n_layers': self.mean_head_n_layers,
+            'mean_head_layer_size': self.mean_head_layer_size
+        }
+    
+    @classmethod
+    def suggest_specific_params(cls, trial):
+        return {
+            'mean_head_layer_size': trial.suggest_int('mean_head_layer_size', 16, 120, step=8),
+            'mean_head_n_layers': trial.suggest_int('mean_head_n_layers', 1, 4)
+        }
+    
     def forward(self, x):
         for layer in self.module_sequence_body_list:
             x = layer(x)
@@ -86,7 +105,7 @@ class MVE_Mean_Head_Extension(BaseModel):
         var = self.var_head(x)
         return mean, var
         
-class MLP_Default(BaseModel):
+class MLP_Default(Default_Base):
     def __init__(self, n_layers, layer_size, num_features, num_targets):
         super().__init__(n_layers, layer_size, num_features, num_targets)
         self.module_sequence_body()
@@ -99,7 +118,7 @@ class MLP_Default(BaseModel):
         return mean
     
 # Dictionary of base models. The boolean indicates variance output.
-base_model_list_dict = {
+base_list_dict = {
     'MVE_Default': [MVE_Default, True],
     'MVE_Mean_Head_Extension': [MVE_Mean_Head_Extension, True],
     'MLP_Default': [MLP_Default, False]

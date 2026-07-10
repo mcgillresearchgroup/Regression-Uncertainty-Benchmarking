@@ -7,13 +7,13 @@ from optuna.pruners import MedianPruner
 from optuna.samplers import TPESampler
 from pathlib import Path, WindowsPath
 import gc
-import sys
 from sklearn.model_selection import KFold, RepeatedKFold, train_test_split
+from Benchmarking.models_and_wrappers.base_list import MVE_Mean_Head_Extension
 from models_and_wrappers.model_wrappers import MVE_Single
 from utils import negative_log_likelihood
 
 
-def create_model_wrapper(wrapper_class, base_model, num_features, num_targets, lr, epochs, 
+def create_model_wrapper(wrapper_class, base_class, num_features, num_targets, lr, epochs, 
                         n_layers, layer_size, mean_head_n_layers, mean_head_layer_size, n_models=5, batch_size=128):
     """Create a model wrapper instance with the specified parameters."""
     return wrapper_class(
@@ -24,14 +24,14 @@ def create_model_wrapper(wrapper_class, base_model, num_features, num_targets, l
         layer_size=layer_size,
         num_features=num_features,
         num_targets=num_targets,
-        base_model=base_model,
+        base_class=base_class,
         batch_size=batch_size,
         mean_head_n_layers=mean_head_n_layers,
         mean_head_layer_size=mean_head_layer_size
     )
 
 
-def create_objective(X, y, wrapper_class, base_model, 
+def create_objective(X, y, wrapper_class, base_class, 
                     num_features, num_targets, verbose=False, batch_size=128, use_kfold=True, n_splits=10,
                     n_repeats=1):
     """Create an Optuna objective function.
@@ -42,25 +42,10 @@ def create_objective(X, y, wrapper_class, base_model,
         n_repeats: Number of times to repeat the k-fold split with a different random seed each time (default: 1, i.e. plain KFold)
     """
     def objective(trial):
-        # Suggest hyperparameters
-        lr = trial.suggest_float('lr', 1e-5, 1e-2, log=True)
-        epochs = trial.suggest_int('epochs', 20, 200, step=20)  # Reduced max from 400
-        n_layers = trial.suggest_int('n_layers', 2, 8)  # Reduced max from 10
-        layer_size = trial.suggest_int('layer_size', 16, 120, step=8)  # Reduced max from 200
-
-        if base_model == 'MVE_Mean_Head_Extension':
-            mean_head_layer_size = trial.suggest_int('mean_head_layer_size', 16, 120, step=8)
-            mean_head_n_layers = trial.suggest_int('mean_head_n_layers', 1, 4)
-        else:
-            mean_head_layer_size = None
-            mean_head_n_layers = None
-
-        if wrapper_class != MVE_Single:
-            n_models = trial.suggest_categorical('n_models', [5])
-        else:
-            n_models = 1
-
-        model = None
+  
+        params = wrapper_class.suggest_specific_params(trial)
+        params.update(base_class.suggest_specific_params(trial))
+        model = create_model_wrapper(wrapper_class, base_class, num_features, num_targets, **params, batch_size=batch_size)
         try:
             if use_kfold:
                 if n_repeats > 1:
@@ -78,9 +63,8 @@ def create_objective(X, y, wrapper_class, base_model,
                         y_tr, y_val = y[train_idx], y[val_idx]
                     
                     model = create_model_wrapper(
-                        wrapper_class, base_model, num_features, num_targets,
-                        lr, epochs, n_layers, layer_size, 
-                        mean_head_n_layers, mean_head_layer_size, n_models, batch_size
+                        wrapper_class, base_class, num_features, num_targets,
+                        **params, batch_size=batch_size
                     )
                     
                     model.fit(X_tr, y_tr)
@@ -102,17 +86,15 @@ def create_objective(X, y, wrapper_class, base_model,
                     gc.collect()
                 
                 nll = np.mean(scores)
-                if verbose:
-                    print(f"  Trial {trial.number} NLL: {nll:.6f} (cv), Layers: {n_layers}, Size: {layer_size}, Epochs: {epochs}")
+                    
             else:
                 # Single train/test split
                 X_train, X_test, y_train, y_test = train_test_split(
                     X, y, train_size=0.8, random_state=81)
                 
                 model = create_model_wrapper(
-                    wrapper_class, base_model, num_features, num_targets,
-                    lr, epochs, n_layers, layer_size,  
-                    mean_head_n_layers, mean_head_layer_size, n_models, batch_size=batch_size
+                    wrapper_class, base_class, num_features, num_targets,
+                    **params, batch_size=batch_size
                 )
                 
                 model.fit(X_train, y_train)
@@ -124,8 +106,6 @@ def create_objective(X, y, wrapper_class, base_model,
                 #var_pred = np.clip(var_pred, min=1e-6, max=1e6)
                 nll = negative_log_likelihood(y_test, mean_pred, var_pred)
                 
-                if verbose:
-                    print(f"  Trial {trial.number} NLL: {nll:.6f}, Layers: {n_layers}, Size: {layer_size}, Epochs: {epochs}")
             
             return nll
             
@@ -152,7 +132,7 @@ def create_objective(X, y, wrapper_class, base_model,
 
 
 def run_hyperparameter_optimization(X, y, wrapper_class, 
-                                   base_model, num_features, num_targets, 
+                                   base_class, num_features, num_targets, 
                                    verbose=False, batch_size=128, n_trials=4, use_kfold=True, n_splits=10,
                                    n_repeats=1):
     """Run optimized hyperparameter optimization.
@@ -175,7 +155,7 @@ def run_hyperparameter_optimization(X, y, wrapper_class,
     )
     
     objective = create_objective(
-        X, y, wrapper_class, base_model,
+        X, y, wrapper_class, base_class,
         num_features, num_targets, verbose=verbose, batch_size=batch_size,
         use_kfold=use_kfold, n_splits=n_splits, n_repeats=n_repeats
     )

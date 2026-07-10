@@ -48,8 +48,6 @@ def run_plotting(pae=False, pre=False, hae=False, preesc=False, paeesc=False, pm
         plot_intervals_ordered(index)
     if pms:
         plot_metrics_summary(index)
-    if pve:
-        plot_variance_error_scatter(index)
 
 
 def build_index():
