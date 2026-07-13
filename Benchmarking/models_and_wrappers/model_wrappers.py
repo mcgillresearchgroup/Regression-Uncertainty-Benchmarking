@@ -10,31 +10,65 @@ from sklearn.base import BaseEstimator, RegressorMixin
 from sklearn.model_selection import KFold
 from .base_list import MVE_Mean_Head_Extension, base_list_dict
 from abc import ABC, abstractmethod
-from utils import data_check
 
 
 class Default_Wrapper(ABC):
-    default_base = 'MVE_Default'   # set by subclasses if they differ
+    default_base = 'MVE_Default'
 
-    def __init__(self, lr=0.001, epochs=100, n_models=5, n_layers=2, layer_size=64,
-                 num_features=10, num_targets=1, base=None, batch_size=None,
-                 mean_head_n_layers=None, mean_head_layer_size=None):
+    # Clean, explicit ordering matching your pipeline arguments
+    def __init__(self, base_class, num_features, num_targets, lr=0.001, epochs=100, 
+                 n_models=5, n_layers=2, layer_size=64, batch_size=128, 
+                 mean_head_n_layers=None, mean_head_layer_size=None, **kwargs):
         
-        self.epochs = epochs
+        self.base_class = base_class
+        # Extract string name for saving compatibility
+        self.base = base_class.__name__ if hasattr(base_class, '__name__') else str(base_class)
+        
+        self.num_features = num_features
+        self.num_targets = num_targets
         self.lr = lr
+        self.epochs = epochs
         self.n_models = n_models
         self.n_layers = n_layers
         self.layer_size = layer_size
-        self.num_features = num_features
-        self.num_targets = num_targets
-        self.base_class = base if base is not None else self.default_base
-        self.batch_size = batch_size  # None = full batch, int = mini-batch size
+        self.batch_size = batch_size
         self.mean_head_n_layers = mean_head_n_layers
         self.mean_head_layer_size = mean_head_layer_size
+        
+        # Pull variance status safely from base_list_dict
+        self.output_variance = base_list_dict.get(self.base, [None, True])[1]
+        
         self.x_scaler = RobustScaler()
         self.y_scaler = RobustScaler()
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
+    def create_models(self):
+        """Create n_models instances of the specified base model."""
+        self.model_set = []
+        for _ in range(self.n_models):
+            # Check by class type safely rather than string-matching
+            if self.base_class is MVE_Mean_Head_Extension:
+                model = self.base_class(
+                    self.n_layers, self.layer_size, self.num_features, self.num_targets, 
+                    mean_head_n_layers=self.mean_head_n_layers, 
+                    mean_head_layer_size=self.mean_head_layer_size
+                )
+            else:
+                model = self.base_class(self.n_layers, self.layer_size, self.num_features, self.num_targets)
+            model = model.to(self.device)
+            self.model_set.append(model)
+
+    def data_check(self, X=None, y=None):
+        if X is not None:
+            if np.isnan(X).any():
+                raise ValueError("NaN detected in input X.")
+            if not np.isfinite(X).all():
+                raise ValueError("Inf detected in input X.")
+        if y is not None:
+            if np.isnan(y).any():
+                raise ValueError("NaN detected in input y.")
+            if not np.isfinite(y).all():
+                raise ValueError("Inf detected in input y.")
 
     def fit(self, X, y):
         """Fit the model with optional mini-batch training.
@@ -45,7 +79,7 @@ class Default_Wrapper(ABC):
             self: Fitted model instance"""
         X = np.asarray(X, dtype=np.float32)
         y = np.asarray(y, dtype=np.float32).reshape(-1, 1) if y.ndim == 1 else np.asarray(y, dtype=np.float32)
-        data_check(X=X, y=y)
+        self.data_check(X=X, y=y)
 
         #scaling and converting to tensors
         self.num_features = X.shape[1]
@@ -60,25 +94,6 @@ class Default_Wrapper(ABC):
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
     
-    def create_models(self):
-        """Create n_models instances of the specified base model.
-        Input:
-            self.n_models: Number of models to create
-        Returns:
-            self.model_set: List of model instances"""
-        
-        
-        # Create model list based on n_models. If chosen model_class is MVE_Mean_Head_Extension, it will pass the additional hyperparameters for the mean head extension.
-        self.model_set = []
-        for _ in range(self.n_models):
-            if self.base_class == MVE_Mean_Head_Extension:
-                model = self.base_class(self.n_layers, self.layer_size, self.num_features, self.num_targets, 
-                                    mean_head_n_layers=self.mean_head_n_layers, mean_head_layer_size=self.mean_head_layer_size)
-            else:
-                model = self.base_class(self.n_layers, self.layer_size, self.num_features, self.num_targets)
-            model = model.to(self.device)
-            self.model_set.append(model)
-
     # Main training section of fit function.
     def training(self, X_tensor, y_tensor):
         """Train models with optional mini-batch support.
@@ -227,7 +242,7 @@ class MVE_Ensemble_Averaged(Default_Wrapper):
 
     def predict(self, X):
         X = np.asarray(X, dtype=np.float32)
-        data_check(X=X)
+        self.data_check(X=X)
         
         X_scaled = self.x_scaler.transform(X)
         X_tensor = torch.from_numpy(X_scaled).float()
@@ -282,7 +297,7 @@ class MLP_Ensemble(Default_Wrapper):
 
     def predict(self, X):
         X = np.asarray(X, dtype=np.float32)
-        data_check(X=X)
+        self.data_check(X=X)
         
         X_scaled = self.x_scaler.transform(X)
         X_tensor = torch.from_numpy(X_scaled).float()
@@ -322,7 +337,7 @@ class MVE_Ensemble_Multiplicative(Default_Wrapper):
 
     def predict(self, X):
         X = np.asarray(X, dtype=np.float32)
-        data_check(X=X)
+        self.data_check(X=X)
         
         X_scaled = self.x_scaler.transform(X)
         X_tensor = torch.from_numpy(X_scaled).float()

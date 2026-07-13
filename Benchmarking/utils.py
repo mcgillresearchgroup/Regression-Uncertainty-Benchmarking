@@ -101,19 +101,6 @@ Examples:
     return parser.parse_args()
 
 
-def data_check(self, X=None, y=None):
-    if X is not None:
-        if np.isnan(X).any():
-            raise ValueError("NaN detected in input X.")
-        if not np.isfinite(X).all():
-            raise ValueError("Inf detected in input X.")
-    if y is not None:
-        if np.isnan(y).any():
-            raise ValueError("NaN detected in input y.")
-        if not np.isfinite(y).all():
-            raise ValueError("Inf detected in input y.")
-
-
 def get_model_label(wrapper, model):
     """Convert wrapper and model names to clean abbreviated labels.
     

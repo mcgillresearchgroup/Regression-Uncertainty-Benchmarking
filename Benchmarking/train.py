@@ -114,15 +114,12 @@ def main():
             'n_layers': int(params['n_layers']),
             'layer_size': int(params['layer_size']),
             'n_models': int(params.get('n_models', 5)),
-            'mean_head_n_layers': params.get('mean_head_n_layers', None),
-            'mean_head_layer_size': params.get('mean_head_layer_size', None)
         }
 
     # Create model wrapper with selected hyperparameters and run a cross validation training to get final metrics
     model_wrapper = create_model_wrapper(
         wrapper_class, base_class, num_features, num_targets,
-        hp['lr'], hp['epochs'], hp['n_layers'], hp['layer_size'], 
-        hp['mean_head_n_layers'], hp['mean_head_layer_size'], hp['n_models'], batch_size=128*4
+        hp['lr'], hp['epochs'], hp['n_layers'], hp['layer_size'], hp['n_models'], batch_size=128*4
     )
     print(f"Batch Size: {128*4}")
     cross_evaluation_folds = 10

@@ -9,25 +9,25 @@ from pathlib import Path, WindowsPath
 import gc
 from sklearn.model_selection import KFold, RepeatedKFold, train_test_split
 from Benchmarking.models_and_wrappers.base_list import MVE_Mean_Head_Extension
-from models_and_wrappers.model_wrappers import MVE_Single
 from utils import negative_log_likelihood
 
 
+import inspect
+
 def create_model_wrapper(wrapper_class, base_class, num_features, num_targets, lr, epochs, 
-                        n_layers, layer_size, mean_head_n_layers, mean_head_layer_size, n_models=5, batch_size=128):
+                        n_layers, layer_size, n_models=5, batch_size=128, **kwargs):
     """Create a model wrapper instance with the specified parameters."""
     return wrapper_class(
+        base_class=base_class,
+        num_features=num_features,
+        num_targets=num_targets,
         lr=lr,
         epochs=epochs,
         n_models=n_models,
         n_layers=n_layers,
         layer_size=layer_size,
-        num_features=num_features,
-        num_targets=num_targets,
-        base_class=base_class,
         batch_size=batch_size,
-        mean_head_n_layers=mean_head_n_layers,
-        mean_head_layer_size=mean_head_layer_size
+        **kwargs  # Cleanly absorbs Optuna extensions like mean_head_n_layers
     )
 
 
