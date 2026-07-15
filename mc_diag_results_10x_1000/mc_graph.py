@@ -8,7 +8,7 @@ group_sizes = [1, 2, 5, 10, 20, 25, 50, 75, 100]  # capped well below N=500 to a
 metrics = ['nll', 'mse', 'mae', 'r2']
 
 rng = np.random.default_rng(0)   # fixed seed -> reproducible figure
-n_draws = 2000          # draws per group size; higher = smoother band, more compute
+n_draws = 10000          # draws per group size; higher = smoother band, more compute
 
 
 def subsample_means(scores, group_sizes, n_draws, rng):
