@@ -1,5 +1,6 @@
 """(Optionally) Runs hyperparameter optimization using optuna."""
 
+import inspect
 import json
 import numpy as np
 import optuna
@@ -7,72 +8,68 @@ from optuna.pruners import MedianPruner
 from optuna.samplers import TPESampler
 from pathlib import Path, WindowsPath
 import gc
-from sklearn.model_selection import KFold, RepeatedKFold, train_test_split
-from Benchmarking.models_and_wrappers.base_list import MVE_Mean_Head_Extension
+from sklearn.model_selection import train_test_split
 from models_and_wrappers.model_wrappers import MVE_Single
 from utils import negative_log_likelihood
+from sklearn.model_selection import ShuffleSplit
 
+def initialize_model(wrapper_class, base_class, num_features, num_targets, **hyperparameters):
+    """Initialize a model wrapper instance from a wrapper class, a base class, and a bag of
+    hyperparameters (e.g. loaded straight from best_parameters.json).
 
-def create_model_wrapper(wrapper_class, base_class, num_features, num_targets, lr, epochs, 
-                        n_layers, layer_size, mean_head_n_layers, mean_head_layer_size, n_models=5, batch_size=128):
-    """Create a model wrapper instance with the specified parameters."""
+    Args:
+        wrapper_class: The wrapper class to instantiate (e.g. MVE_Ensemble_Averaged).
+        base_class: The base model class the wrapper trains internally (e.g. MVE_Default).
+        num_features: Number of input features.
+        num_targets: Number of output targets.
+        **hyperparameters: Any wrapper/base hyperparameters (lr, epochs, n_layers, layer_size,
+            n_models, batch_size, mean_head_n_layers, mean_head_layer_size, etc). Entries that
+            wrapper_class's __init__ doesn't accept are dropped automatically, so this can be
+            called with a full hyperparameters dict (e.g. from load_best_parameters) even if it
+            contains keys that only apply to a different wrapper/base combination.
+    """
+    accepted_params = inspect.signature(wrapper_class.__init__).parameters
+    filtered_hyperparameters = {k: v for k, v in hyperparameters.items() if k in accepted_params}
     return wrapper_class(
-        lr=lr,
-        epochs=epochs,
-        n_models=n_models,
-        n_layers=n_layers,
-        layer_size=layer_size,
+        base_class=base_class,
         num_features=num_features,
         num_targets=num_targets,
-        base_class=base_class,
-        batch_size=batch_size,
-        mean_head_n_layers=mean_head_n_layers,
-        mean_head_layer_size=mean_head_layer_size
+        **filtered_hyperparameters
     )
 
 
 def create_objective(X, y, wrapper_class, base_class, 
-                    num_features, num_targets, verbose=False, batch_size=128, use_kfold=True, n_splits=10,
-                    n_repeats=1):
+                    num_features, num_targets, args, verbose=False, batch_size=128, use_mc_replicates=True, n_splits=20
+                    ):
     """Create an Optuna objective function.
     
     Args:
-        use_kfold: If True, use k-fold cross-validation on X_train/y_train instead of X_test/y_test (default: True)
-        n_splits: Number of folds for cross-validation (default: 10)
+        use_mc_replicates: If True, use Monte Carlo cross-validation on X_train/y_train instead of X_test/y_test (default: True)
+        n_splits: Number of folds for cross-validation (default: 20)
         n_repeats: Number of times to repeat the k-fold split with a different random seed each time (default: 1, i.e. plain KFold)
     """
     def objective(trial):
-  
         params = wrapper_class.suggest_specific_params(trial)
         params.update(base_class.suggest_specific_params(trial))
-        model = create_model_wrapper(wrapper_class, base_class, num_features, num_targets, **params, batch_size=batch_size)
+        model = None
+        job_seeds = np.random.SeedSequence(args.seed).spawn(args.n_jobs)
+        replicate_seeds = job_seeds[args.job_index].spawn(n_splits)
+
         try:
-            if use_kfold:
-                if n_repeats > 1:
-                    kf = RepeatedKFold(n_splits=n_splits, n_repeats=n_repeats, random_state=44)
-                else:
-                    kf = KFold(n_splits=n_splits, shuffle=True, random_state=44)
+            if use_mc_replicates:
                 scores = []
-                
-                for fold_idx, (train_idx, val_idx) in enumerate(kf.split(X)):
-                    if hasattr(X, 'iloc'):
-                        X_tr, X_val = X.iloc[train_idx], X.iloc[val_idx]
-                        y_tr, y_val = y.iloc[train_idx], y.iloc[val_idx]
-                    else:
-                        X_tr, X_val = X[train_idx], X[val_idx]
-                        y_tr, y_val = y[train_idx], y[val_idx]
-                    
-                    model = create_model_wrapper(
-                        wrapper_class, base_class, num_features, num_targets,
-                        **params, batch_size=batch_size
-                    )
-                    
+                for rep_idx, seed_seq in enumerate(replicate_seeds):
+                    seed = int(seed_seq.generate_state(1)[0])
+                    splitter = ShuffleSplit(n_splits=1, test_size=args.test_size, random_state=seed)
+                    train_idx, val_idx = next(splitter.split(X))
+
+                    X_tr, X_val = X.iloc[train_idx], X.iloc[val_idx]
+                    y_tr, y_val = y.iloc[train_idx], y.iloc[val_idx]
+
+                    model = initialize_model(wrapper_class, base_class, num_features, num_targets, **params)
                     model.fit(X_tr, y_tr)
-                    
-                    # Make predictions
                     mean_pred, var_pred = model.predict(X_val)
                     
-                    # Calculate NLL
                     nll = negative_log_likelihood(y_val, mean_pred, var_pred)
                     scores.append(nll)
                     
@@ -84,6 +81,11 @@ def create_objective(X, y, wrapper_class, base_class,
                     if torch.cuda.is_available():
                         torch.cuda.empty_cache()
                     gc.collect()
+
+                    running_mean = np.mean(scores)
+                    trial.report(running_mean, step=rep_idx)
+                    if trial.should_prune():
+                        raise optuna.TrialPruned()
                 
                 nll = np.mean(scores)
                     
@@ -92,7 +94,7 @@ def create_objective(X, y, wrapper_class, base_class,
                 X_train, X_test, y_train, y_test = train_test_split(
                     X, y, train_size=0.8, random_state=81)
                 
-                model = create_model_wrapper(
+                model = initialize_model(
                     wrapper_class, base_class, num_features, num_targets,
                     **params, batch_size=batch_size
                 )
@@ -146,8 +148,7 @@ def run_hyperparameter_optimization(X, y, wrapper_class,
     """
     
     sampler = TPESampler(seed=43)
-    pruner = MedianPruner(n_startup_trials=np.round(n_trials * 0.125, decimals=0), n_warmup_steps=0)
-    
+    pruner = MedianPruner(n_startup_trials=np.round(n_trials * 0.125, decimals=0), n_warmup_steps=5)    
     study = optuna.create_study(
         direction='minimize',
         sampler=sampler,

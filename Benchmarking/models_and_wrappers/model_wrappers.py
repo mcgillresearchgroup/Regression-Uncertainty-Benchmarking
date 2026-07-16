@@ -5,6 +5,7 @@ import torch.nn as nn
 import numpy as np
 import warnings
 import gc
+import inspect
 from sklearn.preprocessing import StandardScaler, RobustScaler
 from sklearn.base import BaseEstimator, RegressorMixin
 from sklearn.model_selection import KFold
@@ -14,20 +15,27 @@ from utils import data_check
 
 
 class Default_Wrapper(ABC):
-    default_base = 'MVE_Default'   # set by subclasses if they differ
+    default_base = 'MVE_Default'   # name in base_list_dict; used if no base_class is given
 
-    def __init__(self, lr=0.001, epochs=100, n_models=5, n_layers=2, layer_size=64,
-                 num_features=10, num_targets=1, base=None, batch_size=None,
+    def __init__(self, base_class, num_features, num_targets, lr=0.001, epochs=100, n_models=5,
+                 n_layers=2, layer_size=64, batch_size=None,
                  mean_head_n_layers=None, mean_head_layer_size=None):
-        
+
+        # base_class may be passed as an actual class or, for convenience/back-compat, as a
+        # name string matching a key in base_list_dict.
+        if base_class is None:
+            base_class = self.default_base
+        if isinstance(base_class, str):
+            base_class = base_list_dict[base_class][0]
+        self.base_class = base_class
+
+        self.num_features = num_features
+        self.num_targets = num_targets
         self.epochs = epochs
         self.lr = lr
         self.n_models = n_models
         self.n_layers = n_layers
         self.layer_size = layer_size
-        self.num_features = num_features
-        self.num_targets = num_targets
-        self.base_class = base if base is not None else self.default_base
         self.batch_size = batch_size  # None = full batch, int = mini-batch size
         self.mean_head_n_layers = mean_head_n_layers
         self.mean_head_layer_size = mean_head_layer_size
@@ -67,15 +75,10 @@ class Default_Wrapper(ABC):
         Returns:
             self.model_set: List of model instances"""
         
-        
-        # Create model list based on n_models. If chosen model_class is MVE_Mean_Head_Extension, it will pass the additional hyperparameters for the mean head extension.
+        base_kwargs = {k: v for k, v in self.base_class.get_base_specific_params(self).items()}
         self.model_set = []
         for _ in range(self.n_models):
-            if self.base_class == MVE_Mean_Head_Extension:
-                model = self.base_class(self.n_layers, self.layer_size, self.num_features, self.num_targets, 
-                                    mean_head_n_layers=self.mean_head_n_layers, mean_head_layer_size=self.mean_head_layer_size)
-            else:
-                model = self.base_class(self.n_layers, self.layer_size, self.num_features, self.num_targets)
+            model = self.base_class(self.num_features, self.num_targets, self.n_layers, self.layer_size, **base_kwargs)
             model = model.to(self.device)
             self.model_set.append(model)
 
@@ -178,7 +181,7 @@ class Default_Wrapper(ABC):
         hyperparams.update(self.model_set[0].get_base_specific_params())
         return {
             'wrapper_name': self.__class__.__name__,
-            'base': self.base,
+            'base_class': self.base_class.__name__,
             'num_features': self.num_features,
             'num_targets': self.num_targets,
             'model_states': [m.state_dict() for m in self.model_set],
@@ -200,7 +203,7 @@ class Default_Wrapper(ABC):
     @classmethod
     def load_from_state(cls, state):
         model = cls(
-            base=state['base'],
+            base_class=state['base_class'],
             num_features=state['num_features'],
             num_targets=state['num_targets'],
             **state['hyperparams']

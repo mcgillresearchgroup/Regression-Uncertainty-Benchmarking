@@ -11,12 +11,12 @@ warnings.filterwarnings('ignore', message='.*X has feature names.*')
 
 # Base model class
 class Default_Base(nn.Module):
-    def __init__(self, n_layers, layer_size, num_features, num_targets = 1, dropout=0.0):
+    def __init__(self, num_features, num_targets, n_layers, layer_size, dropout=0.0):
         super().__init__()
-        self.n_layers = n_layers
-        self.layer_size = layer_size
         self.num_features = num_features
         self.num_targets = num_targets
+        self.n_layers = n_layers
+        self.layer_size = layer_size
         self.size_in = num_features
         self.dropout = dropout
     
@@ -44,8 +44,8 @@ class Default_Base(nn.Module):
 
 
 class MVE_Default(Default_Base):
-    def __init__(self, n_layers, layer_size, num_features, num_targets):
-        super().__init__(n_layers, layer_size, num_features, num_targets)
+    def __init__(self, num_features, num_targets, n_layers, layer_size):
+        super().__init__(num_features, num_targets, n_layers, layer_size)
         self.module_sequence_body()
         self.module_sequence_head()
     
@@ -62,8 +62,8 @@ class MVE_Default(Default_Base):
     
     
 class MVE_Mean_Head_Extension(Default_Base):
-    def __init__(self, n_layers, layer_size, num_features, num_targets, mean_head_n_layers=2, mean_head_layer_size=None):
-        super().__init__(n_layers, layer_size, num_features, num_targets)
+    def __init__(self, num_features, num_targets, n_layers, layer_size, mean_head_n_layers=2, mean_head_layer_size=None):
+        super().__init__(num_features, num_targets, n_layers, layer_size)
         self.mean_head_n_layers = mean_head_n_layers
         self.mean_head_layer_size = mean_head_layer_size if mean_head_layer_size is not None else layer_size
         self.module_sequence_body()
@@ -106,8 +106,8 @@ class MVE_Mean_Head_Extension(Default_Base):
         return mean, var
         
 class MLP_Default(Default_Base):
-    def __init__(self, n_layers, layer_size, num_features, num_targets):
-        super().__init__(n_layers, layer_size, num_features, num_targets)
+    def __init__(self, num_features, num_targets, n_layers, layer_size):
+        super().__init__(num_features, num_targets, n_layers, layer_size)
         self.module_sequence_body()
         self.output_head = nn.Linear(self.size_in, num_targets)
 

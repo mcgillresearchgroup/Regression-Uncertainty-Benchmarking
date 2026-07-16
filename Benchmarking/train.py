@@ -20,7 +20,7 @@ from utils import (
     base_list_dict
 )
 from hyperparameter_optimization import (
-    create_model_wrapper, 
+    initialize_model, 
     run_hyperparameter_optimization,
     load_best_parameters,
     save_best_parameters
@@ -85,9 +85,8 @@ def main():
         best_params, best_nll, _ = run_hyperparameter_optimization(
             X, y, wrapper_class, base_class,
             num_features, num_targets,
-            n_trials=args.n_trials, verbose=args.verbose, batch_size=128, use_kfold=True, n_splits=10
+            n_trials=args.n_trials, args=args, verbose=args.verbose, batch_size=128, use_kfold=True, n_splits=10
         )
-        
         # Save best parameters
         save_best_parameters(best_params, args.dataset, args.wrapper, args.base, best_nll=best_nll)
         
@@ -119,10 +118,11 @@ def main():
         }
 
     # Create model wrapper with selected hyperparameters and run a cross validation training to get final metrics
-    model_wrapper = create_model_wrapper(
+    # initialize_model drops any hp entries that wrapper_class doesn't accept (e.g. mean_head_*
+    # params when base_class isn't MVE_Mean_Head_Extension), so hp can be passed through as-is.
+    model_wrapper = initialize_model(
         wrapper_class, base_class, num_features, num_targets,
-        hp['lr'], hp['epochs'], hp['n_layers'], hp['layer_size'], 
-        hp['mean_head_n_layers'], hp['mean_head_layer_size'], hp['n_models'], batch_size=128*4
+        **hp, batch_size=128 * 4
     )
     print(f"Batch Size: {128*4}")
     cross_evaluation_folds = 10
