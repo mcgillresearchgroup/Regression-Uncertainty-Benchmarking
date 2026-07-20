@@ -6,7 +6,7 @@ from evaluations.plotters_new import run_plotting
 
 # Model combinations to test: (wrapper, model)
 MODEL_COMBINATIONS = [
-    ('MVE_Ensemble_Averaged', 'MVE_Default' ),  # MEA-MD
+    ('SVGPModel', 'GP_Wrapper'), 
 ]
 
 DATASETS = ['Combined_Cycle_Power_Plant']  

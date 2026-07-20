@@ -4,21 +4,46 @@ import pandas as pd
 from abc import ABC, abstractmethod
 import datetime as dt
 import openml as om
+from sklearn.datasets import fetch_openml
 
 class Dataset(ABC):
     """Base class for datasets."""
     name = None
     id = None
+    source = None
     
     def load(self):
-        """Load dataset and return features, targets, and their dimensions.
-        
-        Returns:
-            Tuple of (data_x, data_y, num_features, num_targets)
-        """
+        """Unified entry point called by the framework loader."""
+        if self.source == 'uci':
+            return self.load_uci()
+        elif self.source == 'openml':
+            return self.load_openml()
+        else:
+            raise ValueError(f"Unknown data source: {self.source}")
+
+    def load_uci(self):
+        """Utility fallback to load dataset from UCI repo."""
         dataset = fetch_ucirepo(id=self.id)
         data_x = dataset.data.features
         data_y = dataset.data.targets
+        return data_x, data_y, data_x.shape[1], data_y.shape[1] if len(data_y.shape) > 1 else 1
+
+    def load_openml(self):
+        """Utility fallback to load dataset from OpenML."""
+        # fetch_openml returns a bunch-like object; parser='auto' is recommended
+        dataset = fetch_openml(data_id=self.id, as_frame=True, parser='auto')
+        
+        # If your targets/features aren't automatically split by openml, 
+        # we pull the full frame or explicitly slice them.
+        if dataset.target is not None:
+            data_x = pd.DataFrame(dataset.data)
+            data_y = pd.DataFrame(dataset.target)
+        else:
+            # Fallback if target is unassigned in OpenML metadata
+            df = dataset.frame
+            data_x = df.iloc[:, :-1]
+            data_y = df.iloc[:, [-1]]
+
         return data_x, data_y, data_x.shape[1], data_y.shape[1] if len(data_y.shape) > 1 else 1
 
 
@@ -28,7 +53,7 @@ class WineQuality(Dataset):
         self.name = 'Wine_Quality'
         self.id = 186
         self.wine_color = wine_color
-    def load(self):
+    def load_uci(self):
         """Load Wine Quality dataset and prompt for wine color selection."""
         dataset = fetch_ucirepo(id=self.id)
         df = dataset.data.original
@@ -53,17 +78,12 @@ class AppliancesEnergyPrediction(Dataset):
     """Appliances Energy Prediction dataset."""
     name = 'Appliances Energy Prediction'
     id = 374
-    def load(self):
+    def load_uci(self):
         """Load Appliances Energy Prediction dataset."""
         #try: 
         dataset = fetch_ucirepo(id=self.id)
         data_x = dataset.data.features
         datetime_data = pd.to_datetime(data_x['date'], format='%Y-%m-%d%H:%M:%S')
-        #except Exception as e:
-            #df = pd.read_csv('temp_dataset_files/energydata_complete.csv')
-            #data_x = df.iloc[:, :-1]  # Select all columns except the last one
-            #data_y = df.iloc[:, -1]   # Select the last column as target
-            #datetime_data = pd.to_datetime(data_x['date'], format='%Y-%m-%d %H:%M:%S')
         data_x.drop(columns=['date'], inplace=True)
         jan_first = dt.date(datetime_data[0].year, 1, 1)
         data_x['days_since_jan1'] = (datetime_data - pd.to_datetime(jan_first)).dt.days
@@ -77,7 +97,7 @@ class RTIoT2022(Dataset):
     """RT-IoT2022 (RT-IoT) dataset."""
     name = 'RT-IoT2022'
     id = 942
-    def load(self):
+    def load_uci(self):
         """Load RT-IoT2022 dataset."""
         dataset = fetch_ucirepo(id=self.id)
         data_x = dataset.data.features
@@ -97,30 +117,103 @@ class RTIoT2022(Dataset):
 
 class ConcreteCompressiveStrength(Dataset):
     """Concrete Compressive Strength dataset."""
-    name = 'Concrete Compressive Strength'
-    id = 165
-
+    def __init__(self):
+        self.name = 'Concrete Compressive Strength'
+        self.id = 165
+        self.source = 'uci'
 
 class CombinedCyclePowerPlant(Dataset):
     """Combined Cycle Power Plant dataset."""
-    name = 'Combined Cycle Power Plant'
-    id = 294
+    def __init__(self):
+        self.name = 'Combined Cycle Power Plant'
+        self.id = 294
+        self.source = 'uci'
+
+class Space_Ga(Dataset):
+    """Space_Ga dataset."""
+    def __init__(self):
+        self.name = 'Space_Ga'
+        self.id = 507
+        self.source = 'openml'
+
+class House_Sales(Dataset):
+    """House Sales dataset."""
+    def __init__(self):
+        self.name = 'House_Sales'
+        self.id = 42731
+        self.source = 'openml'
+
+class CpuActOpenML(Dataset):
+    """Cpu_act dataset from Grinsztajn et al. Benchmark."""
+    def __init__(self):
+        self.name = 'Cpu_Act'
+        self.id = 44132
+        self.source = 'openml'
+
+class AileronsOpenML(Dataset):
+    """Ailerons dataset from Grinsztajn et al. Benchmark."""
+    def __init__(self):
+        self.name = 'Ailerons'
+        self.id = 44135
+        self.source = 'openml'
+
+class HousesOpenML(Dataset):
+    """Houses dataset (California / Boston Housing variants) from Grinsztajn et al. Benchmark."""
+    def __init__(self):
+        self.name = 'Houses_OpenML'
+        self.id = 44141
+        self.source = 'openml'
+
+class ElevatorsOpenML(Dataset):
+    """Elevators dataset from Grinsztajn et al. Benchmark."""
+    def __init__(self):
+        self.name = 'Elevators'
+        self.id = 44133
+        self.source = 'openml'
+
+class PolOpenML(Dataset):
+    """Pol dataset from Grinsztajn et al. Benchmark."""
+    def __init__(self):
+        self.name = 'Pol_OpenML'
+        self.id = 44134
+        self.source = 'openml'
+
+class BikeSharingOpenML(Dataset):
+    """Bike Sharing dataset from Grinsztajn et al. Benchmark."""
+    def __init__(self):
+        self.name = 'Bike_Sharing_OpenML'
+        self.id = 44148
+        self.source = 'openml'
+
+class MiamiHousingOpenML(Dataset):
+    """Miami Housing dataset from Grinsztajn et al. Benchmark."""
+    def __init__(self):
+        self.name = 'Miami_Housing_OpenML'
+        self.id = 44147
+        self.source = 'openml'
 
 # Dictionary mapping dataset names to classes
 DATASETS = {
+    # Existing UCI Datasets
     'Red_Wine_Quality': lambda: WineQuality(wine_color='red'),
     'White_Wine_Quality': lambda: WineQuality(wine_color='white'),
-    #'Appliances_Energy_Prediction': AppliancesEnergyPrediction(), ## Removed for now due to large dataset size, loading issues, and poor fit for regression.
-    #'RT-IoT2022': lambda: RTIoT2022(), ## Removed for now due to needing 3 OneHotEncoders which leads to NaN issues.
     'Concrete_Compressive_Strength': lambda: ConcreteCompressiveStrength(),
     'Combined_Cycle_Power_Plant': lambda: CombinedCyclePowerPlant(),
+    
+    # New OpenML Paper Benchmarks (Numerical Suite)
+    'Cpu_Act': lambda: CpuActOpenML(),
+    'Ailerons': lambda: AileronsOpenML(),
+    'Houses_OpenML': lambda: HousesOpenML(),
+    'Elevators': lambda: ElevatorsOpenML(),
+    'Pol_OpenML': lambda: PolOpenML(),
+    
+    # New OpenML Paper Benchmarks (Mixed Suite)
+    'Bike_Sharing_OpenML': lambda: BikeSharingOpenML(),
+    'Miami_Housing_OpenML': lambda: MiamiHousingOpenML(),
 }
 
-# Reverse mapping for ID lookup
+# The automated downstream indices look up everything flawlessly from here:
 ID_TO_DATASET = {v().id: v for v in DATASETS.values()}
-
-
-# For backwards compatibility with code that uses id_dict and data_pull_dict
 id_dict = {name: dataset_class().id for name, dataset_class in DATASETS.items()}
 data_pull_dict = DATASETS
 
