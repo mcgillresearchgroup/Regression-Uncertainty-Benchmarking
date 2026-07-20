@@ -85,37 +85,21 @@ def main():
         best_params, best_nll, _ = run_hyperparameter_optimization(
             X, y, wrapper_class, base_class,
             num_features, num_targets,
-            n_trials=args.n_trials, args=args, verbose=args.verbose, batch_size=128, use_kfold=True, n_splits=10
+            verbose=args.verbose, batch_size=128, n_trials=args.n_trials, use_mc_cv=True, n_replicates=20, train_percent=args.train_percent
         )
         # Save best parameters
-        save_best_parameters(best_params, args.dataset, args.wrapper, args.base, best_nll=best_nll)
-        
-        hp = {
-            'lr': best_params['lr'],
-            'epochs': best_params['epochs'],
-            'n_layers': best_params['n_layers'],
-            'layer_size': best_params['layer_size'],
-            'n_models': best_params.get('n_models', 5),
-            'mean_head_n_layers': best_params.get('mean_head_n_layers', None),
-            'mean_head_layer_size': best_params.get('mean_head_layer_size', None),
-        }
+        save_best_parameters(best_params, args.dataset, args.wrapper, args.base, args.train_percent, best_nll=best_nll)
+
+        hp = best_params
         
     elif args.use_best is not None:
         # Try to load best parameters
         print(f"Loading best parameters from: {args.use_best}")
-        best_params = load_best_parameters(args.dataset, args.wrapper, args.base, filepath=args.use_best)
-        print(f"best_params: {best_params}")
-        params = best_params.get('hyperparameters', best_params)
-        
-        hp = {
-            'lr': float(params['lr']),
-            'epochs': int(params['epochs']),
-            'n_layers': int(params['n_layers']),
-            'layer_size': int(params['layer_size']),
-            'n_models': int(params.get('n_models', 5)),
-            'mean_head_n_layers': params.get('mean_head_n_layers', None),
-            'mean_head_layer_size': params.get('mean_head_layer_size', None)
-        }
+        hp = load_best_parameters(args.dataset, args.wrapper, args.base, filepath=args.use_best)
+        if hp is None:
+            print(f"No saved hyperparameters found for {args.dataset}/{args.wrapper}/{args.base} in {args.use_best}.")
+            sys.exit(1)
+        print(f"hyperparameters: {hp}")
 
     # Create model wrapper with selected hyperparameters and run a cross validation training to get final metrics
     # initialize_model drops any hp entries that wrapper_class doesn't accept (e.g. mean_head_*

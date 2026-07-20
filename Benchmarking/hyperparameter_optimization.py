@@ -30,6 +30,9 @@ def initialize_model(wrapper_class, base_class, num_features, num_targets, **hyp
     """
     accepted_params = inspect.signature(wrapper_class.__init__).parameters
     filtered_hyperparameters = {k: v for k, v in hyperparameters.items() if k in accepted_params}
+    extra_params = {k: v for k, v in hyperparameters.items() if k not in accepted_params}
+    if len(extra_params) > 0:
+        raise KeyError(f"Warning: Ignoring extra hyperparameters not accepted by {wrapper_class.__name__}: {list(extra_params.keys())}")
     return wrapper_class(
         base_class=base_class,
         num_features=num_features,
@@ -39,29 +42,32 @@ def initialize_model(wrapper_class, base_class, num_features, num_targets, **hyp
 
 
 def create_objective(X, y, wrapper_class, base_class, 
-                    num_features, num_targets, args, verbose=False, batch_size=128, use_mc_replicates=True, n_splits=20
+                    num_features, num_targets, args, verbose=False, batch_size=128, use_mc_cv=True, n_replicates=20, train_percent=100
                     ):
     """Create an Optuna objective function.
     
     Args:
-        use_mc_replicates: If True, use Monte Carlo cross-validation on X_train/y_train instead of X_test/y_test (default: True)
-        n_splits: Number of folds for cross-validation (default: 20)
-        n_repeats: Number of times to repeat the k-fold split with a different random seed each time (default: 1, i.e. plain KFold)
+        use_mc_cv: If True, use Monte Carlo cross-validation instead of an 80/20 single split (default: True)
+        n_replicates: Number of replicates for Monte Carlo cross-validation (default: 20)
+        train_percent: Percentage of the training dataset to use for each replicate (default: 100)
     """
     def objective(trial):
         params = wrapper_class.suggest_specific_params(trial)
         params.update(base_class.suggest_specific_params(trial))
         model = None
         job_seeds = np.random.SeedSequence(args.seed).spawn(args.n_jobs)
-        replicate_seeds = job_seeds[args.job_index].spawn(n_splits)
+        replicate_seeds = job_seeds[args.job_index].spawn(n_replicates)
 
         try:
-            if use_mc_replicates:
+            if use_mc_cv:
                 scores = []
                 for rep_idx, seed_seq in enumerate(replicate_seeds):
                     seed = int(seed_seq.generate_state(1)[0])
                     splitter = ShuffleSplit(n_splits=1, test_size=args.test_size, random_state=seed)
                     train_idx, val_idx = next(splitter.split(X))
+                    train_size = len(train_idx)
+                    train_size = int(train_size * train_percent)
+                    train_idx = train_idx[:train_size]
 
                     X_tr, X_val = X.iloc[train_idx], X.iloc[val_idx]
                     y_tr, y_val = y.iloc[train_idx], y.iloc[val_idx]
@@ -114,37 +120,38 @@ def create_objective(X, y, wrapper_class, base_class,
         except optuna.TrialPruned:
             raise
         except Exception as e:
-            if verbose:
-                print(f"  Trial {trial.number} failed: {type(e).__name__}: {e}")
-            import traceback
-            traceback.print_exc()
-            return float('inf')
+            print(f"Trial failed due to: {e}")
+            return float('inf') 
+
         finally:
-            # Aggressive cleanup after each trial
-            if model is not None:
-                del model
-            
-            # Clear tensors and cache
-            import torch
+            if 'wrapper' in locals():
+                del wrapper
+            gc.collect()
             if torch.cuda.is_available():
                 torch.cuda.empty_cache()
-            gc.collect()
-    
+        
     return objective
 
 
 def run_hyperparameter_optimization(X, y, wrapper_class, 
                                    base_class, num_features, num_targets, 
-                                   verbose=False, batch_size=128, n_trials=4, use_kfold=True, n_splits=10,
-                                   n_repeats=1):
+                                   verbose=False, batch_size=128, n_trials=4, use_mc_cv=True, 
+                                   n_replicates=20, train_percent=100):
     """Run optimized hyperparameter optimization.
     
     Args:
-        n_trials: Number of trials (default: 48)
-        batch_size: Mini-batch size for training (default: 32)
-        use_kfold: If True, use k-fold cross-validation instead of single train/test split (default: True)
-        n_splits: Number of folds for cross-validation (default: 5)
-        n_repeats: Number of repeats for RepeatedKFold; use 1 for plain KFold (default: 1)
+        X: Input features (DataFrame or array-like)
+        y: Target values (Series or array-like)
+        wrapper_class: The model wrapper class to optimize (e.g., MVE_Ensemble_Averaged)
+        base_class: The base model class to optimize (e.g., MVE_Default)
+        num_features: Number of input features
+        num_targets: Number of output targets
+        verbose: If True, print detailed logs (default: False)
+        batch_size: Batch size for training (default: 128)
+        n_trials: Number of Optuna trials to run (default: 4)
+        use_mc_cv: If True, use Monte Carlo cross-validation; otherwise, use a single train/test split (default: True)
+        n_splits: Number of replicates for Monte Carlo cross-validation (default: 20)
+        train_percent: Percentage of the training dataset to use for each fold (default: 100)
     """
     
     sampler = TPESampler(seed=43)
@@ -157,8 +164,9 @@ def run_hyperparameter_optimization(X, y, wrapper_class,
     
     objective = create_objective(
         X, y, wrapper_class, base_class,
-        num_features, num_targets, verbose=verbose, batch_size=batch_size,
-        use_kfold=use_kfold, n_splits=n_splits, n_repeats=n_repeats
+        num_features, num_targets, verbose, batch_size,
+        use_mc_cv=use_mc_cv, n_replicates=n_replicates,
+        train_percent=train_percent
     )
     
     study.optimize(objective, n_trials=n_trials, show_progress_bar=not verbose)
@@ -166,7 +174,7 @@ def run_hyperparameter_optimization(X, y, wrapper_class,
     return study.best_params, study.best_value, study
 
 
-def save_best_parameters(best_params, dataset, wrapper_name, model_name, filepath=None, best_nll=None):
+def save_best_parameters(best_params, dataset, wrapper_name, model_name, train_percent, filepath=None, best_nll=None):
     """Save best hyperparameters to JSON file with consistent formatting.
     
     Only overwrites existing parameters if the new NLL is lower than the existing one.
@@ -176,6 +184,7 @@ def save_best_parameters(best_params, dataset, wrapper_name, model_name, filepat
         dataset: Dataset name
         wrapper_name: Wrapper class name
         model_name: Model name
+        train_percent: Percentage of the training dataset used for each fold
         filepath: Path to save JSON (default: results/best_parameters.json)
         best_nll: Best NLL value (optional)
     """
@@ -208,6 +217,7 @@ def save_best_parameters(best_params, dataset, wrapper_name, model_name, filepat
         "dataset": dataset,
         "wrapper": wrapper_name,
         "model": model_name,
+        "train_percent": train_percent,
         "hyperparameters": best_params
     }
     
@@ -243,7 +253,6 @@ def load_best_parameters(dataset, wrapper_name, model_name, filepath=None):
     entry = all_params.get(key, None)
 
     if entry is None:
-        print(f"No best parameters found for {key} in {filepath}")
         return None
     
     # Handle both old flat format and new nested format

@@ -5,9 +5,13 @@ import numpy as np
 import warnings
 from sklearn.preprocessing import StandardScaler, RobustScaler
 from sklearn.base import BaseEstimator, RegressorMixin
+import gpytorch
+from gpytorch.models import ApproximateGP
+from gpytorch.variational import CholeskyVariationalDistribution, VariationalStrategy
 
 torch.manual_seed(82)  # Set seed for reproducibility in training
 warnings.filterwarnings('ignore', message='.*X has feature names.*')
+
 
 # Base model class
 class Default_Base(nn.Module):
@@ -104,7 +108,8 @@ class MVE_Mean_Head_Extension(Default_Base):
         mean = self.mean_head(mean)
         var = self.var_head(x)
         return mean, var
-        
+
+
 class MLP_Default(Default_Base):
     def __init__(self, num_features, num_targets, n_layers, layer_size):
         super().__init__(num_features, num_targets, n_layers, layer_size)
@@ -116,10 +121,36 @@ class MLP_Default(Default_Base):
             x = layer(x)
         mean = self.output_head(x)
         return mean
+
+
+class SVGPModel(ApproximateGP):
+    def __init__(self, inducing_points, num_features=None, **kwargs):
+        variational_distribution = CholeskyVariationalDistribution(inducing_points.size(0))
+        variational_strategy = VariationalStrategy(
+            self, inducing_points, variational_distribution, learn_inducing_locations=True
+        )
+        super().__init__(variational_strategy)
+
+        self.mean_module = gpytorch.means.ConstantMean()
+        ard_dims = num_features if num_features is not None else inducing_points.size(-1)
+        self.covar_module = gpytorch.kernels.ScaleKernel(gpytorch.kernels.RBFKernel(ard_num_dims=ard_dims))
+
+    def forward(self, x):
+        mean_x = self.mean_module(x)
+        covar_x = self.covar_module(x)
+        return gpytorch.distributions.MultivariateNormal(mean_x, covar_x)
+
+    def get_base_specific_params(self):
+        return {}
     
+    @classmethod
+    def suggest_specific_params(cls, trial):
+        # Add any base-level hyperparameters for optimization here if needed
+        return {}
 # Dictionary of base models. The boolean indicates variance output.
 base_list_dict = {
     'MVE_Default': [MVE_Default, True],
     'MVE_Mean_Head_Extension': [MVE_Mean_Head_Extension, True],
-    'MLP_Default': [MLP_Default, False]
+    'MLP_Default': [MLP_Default, False],
+    'SVGPModel': [SVGPModel, True]
 }

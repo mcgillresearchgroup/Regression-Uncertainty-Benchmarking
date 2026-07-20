@@ -197,7 +197,7 @@ class Default_Wrapper(ABC):
             'epochs': trial.suggest_int('epochs', 20, 200, step=20),
             'n_layers': trial.suggest_int('n_layers', 2, 8),
             'layer_size': trial.suggest_int('layer_size', 16, 120, step=8),
-            'n_models': trial.suggest_categorical('n_models', [5])
+            'batch_size': trial.suggest_int('batch_size', 128, 2048, step=128)
         }
 
     @classmethod
@@ -377,9 +377,129 @@ class MVE_Ensemble_Multiplicative(Default_Wrapper):
 
         return multiplicative_mean, multiplicative_var
 
-# Dictionary of model wrappers. The boolean indicates whether the wrapper requires variance output from the base model.
+
+from torch.utils.data import TensorDataset, DataLoader
+import gpytorch
+
+class GP_Wrapper(Default_Wrapper):
+    default_base = 'SVGPModel'
+
+    def __init__(self, base_class=None, num_features=None, num_targets=None, 
+                 lr=0.01, epochs=50, num_inducing=500, batch_size=1024, **kwargs):
+        # Initialize standard wrapper fields
+        super().__init__(
+            base_class=base_class, num_features=num_features, num_targets=num_targets,
+            lr=lr, epochs=epochs, batch_size=batch_size
+        )
+        self.num_inducing = num_inducing
+        self.output_variance = True
+        self.likelihood = gpytorch.likelihoods.GaussianLikelihood().to(self.device)
+
+    def create_models(self):
+        """GP models need data tensors to initialize inducing points. 
+        Instantiation is deferred to the training method where tensors are ready."""
+        self.model_set = []
+
+    def training(self, X_tensor, y_tensor):
+        n_samples = X_tensor.shape[0]
+        fraction = self.kwargs.get('inducing_fraction', 0.10)
+        target_inducing = int(n_samples * fraction)
+
+        num_inducing = max(100, min(target_inducing, 2000))
+        if num_inducing > n_samples:
+            num_inducing = n_samples
+        inducing_idx = np.random.choice(n_samples, num_inducing, replace=False)
+        inducing_points = X_tensor[inducing_idx].clone()
+        
+        model = self.base_class(inducing_points=inducing_points, num_features=self.num_features)
+        model = model.to(self.device)
+        self.likelihood = self.likelihood.to(self.device)
+        self.model_set = [model]
+        
+        model.train()
+        self.likelihood.train()
+        
+        optimizer = torch.optim.Adam(
+            list(model.parameters()) + list(self.likelihood.parameters()), lr=self.lr
+        )
+        
+        # Variational ELBO as the loss objective
+        mll = gpytorch.mlls.VariationalELBO(self.likelihood, model, num_data=y_tensor.size(0))
+        
+        batch_size = self.batch_size if self.batch_size is not None else n_samples
+        train_dataset = TensorDataset(X_tensor, y_tensor.flatten())
+        train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+        
+        for epoch in range(self.epochs):
+            epoch_loss = 0.0
+            for x_batch, y_batch in train_loader:
+                optimizer.zero_grad()
+                output = model(x_batch)
+                loss = -mll(output, y_batch)
+                loss.backward()
+                optimizer.step()
+                epoch_loss += loss.item()
+                
+            print(f"GP Model 1/1, Epoch {epoch + 1}/{self.epochs}, Loss: {epoch_loss / len(train_loader):.4f}")
+            
+        # Move back to CPU to save GPU memory
+        model.cpu()
+        self.likelihood.cpu()
+        gc.collect()
+
+    def predict(self, X):
+        X = np.asarray(X, dtype=np.float32)
+        data_check(X=X)
+        
+        X_scaled = self.x_scaler.transform(X)
+        X_tensor = torch.from_numpy(X_scaled).float().to(self.device)
+        
+        model = self.model_set[0]
+        model.eval()
+        self.likelihood.eval()
+        model = model.to(self.device)
+        self.likelihood = self.likelihood.to(self.device)
+        
+
+        with torch.inference_mode():
+            predictions = self.likelihood(model(X_tensor))
+            y_pred = predictions.mean.cpu().numpy().reshape(-1, self.num_targets)
+            y_var = (predictions.stddev.cpu().numpy() ** 2).reshape(-1, self.num_targets)
+            
+        model.cpu()
+        self.likelihood.cpu()
+        del X_tensor, predictions
+        
+        y_pred_unscaled = self.y_scaler.inverse_transform(y_pred)
+        y_var_unscaled = y_var * (self.y_scaler.scale_.reshape(1, -1) ** 2)
+        
+        gc.collect()
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+        
+        return y_pred_unscaled, y_var_unscaled
+
+    def get_wrapper_specific_params(self):
+        return {
+            'lr': self.lr,
+            'epochs': self.epochs,
+            'num_inducing': self.num_inducing,
+            'batch_size': self.batch_size,
+        }
+
+    @classmethod
+    def suggest_specific_params(cls, trial):
+        return {
+            'lr': trial.suggest_float('lr', 1e-4, 1e-1, log=True),
+            'epochs': trial.suggest_int('epochs', 20, 100, step=10),
+            'batch_size': trial.suggest_int('batch_size', 128, 2048, step=128),
+            'inducing_fraction': trial.suggest_float('inducing_fraction', 0.05, 0.15)
+        }
+
+
 wrapper_list_dict = {
     'MVE_Ensemble_Averaged': [MVE_Ensemble_Averaged, True],
     'MLP_Ensemble': [MLP_Ensemble, False],
-    'MVE_Ensemble_Multiplicative': [MVE_Ensemble_Multiplicative, True]
+    'MVE_Ensemble_Multiplicative': [MVE_Ensemble_Multiplicative, True],
+    'GP_Wrapper': [GP_Wrapper, True] 
 }

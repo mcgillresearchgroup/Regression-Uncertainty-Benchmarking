@@ -97,6 +97,13 @@ Examples:
         action='store_true',
         help='Enable verbose output'
     )
+
+    parser.add_argument(
+        '--train-percent',
+        type=float,
+        default=100,
+        help='Percentage of the train set to use for hyperparameter optimization (default: 100)'
+    )
     
     return parser.parse_args()
 
@@ -135,6 +142,7 @@ def get_model_label(wrapper, model):
         'MVE_Default': 'MD',
         'MVE_Mean_Head_Extension': 'MH',
         'MLP_Default': 'MLP',
+        'SVGPModel': 'SVGP'
     }
     
     wrapper_label = wrapper_map.get(wrapper, wrapper)
