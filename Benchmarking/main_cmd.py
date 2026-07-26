@@ -11,7 +11,7 @@ MODEL_COMBINATIONS = [
 
 DATASETS = ['Combined_Cycle_Power_Plant', 'Cpu_Act', 'Ailerons', 'Houses_OpenML', 'Elevators', 'Pol_OpenML']
 n = 1
-seed_list = [n, n+1, n+2, n+3, n+4]  # Seeds for reproducibility
+seed_list = [n, n+1, n+2, n+3, n+4, n+5, n+6, n+7, n+8, n+9]  # Seeds for reproducibility
 
 def parse_args():
     """Parse command line arguments."""
@@ -46,7 +46,7 @@ def run_training(combinations_to_run=None, use_best=None, optimize=False, datase
             "-m", model,
             "-w", wrapper,
             "--seed", f"{seed + 102}",
-            "--train-percent", f"{seed*20}"
+            "--train-percent", f"{seed*10}"
         ]
 
         if optimize:
