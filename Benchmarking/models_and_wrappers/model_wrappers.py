@@ -11,7 +11,20 @@ from sklearn.base import BaseEstimator, RegressorMixin
 from sklearn.model_selection import KFold
 from .base_list import MVE_Mean_Head_Extension, base_list_dict
 from abc import ABC, abstractmethod
-from utils import data_check
+
+
+def data_check(X=None, y=None):
+    """Validate that inputs contain no NaNs or infinite values."""
+    if X is not None:
+        if np.isnan(X).any():
+            raise ValueError("NaN detected in input X.")
+        if not np.isfinite(X).all():
+            raise ValueError("Inf detected in input X.")
+    if y is not None:
+        if np.isnan(y).any():
+            raise ValueError("NaN detected in input y.")
+        if not np.isfinite(y).all():
+            raise ValueError("Inf detected in input y.")
 
 
 class Default_Wrapper(ABC):
