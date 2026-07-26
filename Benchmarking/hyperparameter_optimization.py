@@ -3,6 +3,7 @@
 import inspect
 import json
 import numpy as np
+import torch
 import optuna
 from optuna.pruners import MedianPruner
 from optuna.samplers import TPESampler
@@ -41,32 +42,37 @@ def initialize_model(wrapper_class, base_class, num_features, num_targets, **hyp
     )
 
 
-def create_objective(X, y, wrapper_class, base_class, 
-                    num_features, num_targets, args, verbose=False, batch_size=128, use_mc_cv=True, n_replicates=20, train_percent=100
+def create_objective(X, y, wrapper_class, base_class,
+                    num_features, num_targets, seed, test_size=0.2, verbose=False, batch_size=128,
+                    use_mc_cv=True, n_replicates=20, train_percent=100, n_jobs=1, job_index=0
                     ):
     """Create an Optuna objective function.
     
     Args:
+        seed: Master seed used to derive per-job/per-replicate seed streams.
+        test_size: Fraction of data held out for validation in each MC-CV replicate (default: 0.2).
         use_mc_cv: If True, use Monte Carlo cross-validation instead of an 80/20 single split (default: True)
         n_replicates: Number of replicates for Monte Carlo cross-validation (default: 20)
         train_percent: Percentage of the training dataset to use for each replicate (default: 100)
+        n_jobs: Total number of parallel jobs sharing the seed stream derived from `seed` (default: 1)
+        job_index: This job's 0-based index into the `n_jobs` seed stream (default: 0)
     """
     def objective(trial):
         params = wrapper_class.suggest_specific_params(trial)
         params.update(base_class.suggest_specific_params(trial))
         model = None
-        job_seeds = np.random.SeedSequence(args.seed).spawn(args.n_jobs)
-        replicate_seeds = job_seeds[args.job_index].spawn(n_replicates)
+        job_seeds = np.random.SeedSequence(seed).spawn(n_jobs)
+        replicate_seeds = job_seeds[job_index].spawn(n_replicates)
 
         try:
             if use_mc_cv:
                 scores = []
                 for rep_idx, seed_seq in enumerate(replicate_seeds):
-                    seed = int(seed_seq.generate_state(1)[0])
-                    splitter = ShuffleSplit(n_splits=1, test_size=args.test_size, random_state=seed)
+                    replicate_seed = int(seed_seq.generate_state(1)[0])
+                    splitter = ShuffleSplit(n_splits=1, test_size=test_size, random_state=replicate_seed)
                     train_idx, val_idx = next(splitter.split(X))
                     train_size = len(train_idx)
-                    train_size = int(train_size * train_percent)
+                    train_size = int(train_size * (train_percent / 100))
                     train_idx = train_idx[:train_size]
 
                     X_tr, X_val = X.iloc[train_idx], X.iloc[val_idx]
@@ -83,7 +89,6 @@ def create_objective(X, y, wrapper_class, base_class,
                     if model is not None:
                         del model
                         model = None
-                    import torch
                     if torch.cuda.is_available():
                         torch.cuda.empty_cache()
                     gc.collect()
@@ -124,8 +129,8 @@ def create_objective(X, y, wrapper_class, base_class,
             return float('inf') 
 
         finally:
-            if 'wrapper' in locals():
-                del wrapper
+            if 'model' in locals() and model is not None:
+                del model
             gc.collect()
             if torch.cuda.is_available():
                 torch.cuda.empty_cache()
@@ -133,10 +138,11 @@ def create_objective(X, y, wrapper_class, base_class,
     return objective
 
 
-def run_hyperparameter_optimization(X, y, wrapper_class, 
-                                   base_class, num_features, num_targets, 
-                                   verbose=False, batch_size=128, n_trials=4, use_mc_cv=True, 
-                                   n_replicates=20, train_percent=100):
+def run_hyperparameter_optimization(X, y, wrapper_class,
+                                   base_class, num_features, num_targets,
+                                   seed, test_size=0.2, verbose=False, batch_size=128, n_trials=4,
+                                   use_mc_cv=True, n_replicates=20, train_percent=100,
+                                   n_jobs=1, job_index=0):
     """Run optimized hyperparameter optimization.
     
     Args:
@@ -146,12 +152,16 @@ def run_hyperparameter_optimization(X, y, wrapper_class,
         base_class: The base model class to optimize (e.g., MVE_Default)
         num_features: Number of input features
         num_targets: Number of output targets
+        seed: Master seed used to derive per-job/per-replicate seed streams.
+        test_size: Fraction of data held out for validation in each MC-CV replicate (default: 0.2).
         verbose: If True, print detailed logs (default: False)
         batch_size: Batch size for training (default: 128)
         n_trials: Number of Optuna trials to run (default: 4)
         use_mc_cv: If True, use Monte Carlo cross-validation; otherwise, use a single train/test split (default: True)
-        n_splits: Number of replicates for Monte Carlo cross-validation (default: 20)
+        n_replicates: Number of replicates for Monte Carlo cross-validation (default: 20)
         train_percent: Percentage of the training dataset to use for each fold (default: 100)
+        n_jobs: Total number of parallel jobs sharing the seed stream derived from `seed` (default: 1)
+        job_index: This job's 0-based index into the `n_jobs` seed stream (default: 0)
     """
     
     sampler = TPESampler(seed=43)
@@ -164,9 +174,10 @@ def run_hyperparameter_optimization(X, y, wrapper_class,
     
     objective = create_objective(
         X, y, wrapper_class, base_class,
-        num_features, num_targets, verbose, batch_size,
+        num_features, num_targets, seed=seed, test_size=test_size,
+        verbose=verbose, batch_size=batch_size,
         use_mc_cv=use_mc_cv, n_replicates=n_replicates,
-        train_percent=train_percent
+        train_percent=train_percent, n_jobs=n_jobs, job_index=job_index
     )
     
     study.optimize(objective, n_trials=n_trials, show_progress_bar=not verbose)

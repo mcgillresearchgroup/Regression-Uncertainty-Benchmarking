@@ -84,7 +84,7 @@ def main():
         # Run hyperparameter optimization
         best_params, best_nll, _ = run_hyperparameter_optimization(
             X, y, wrapper_class, base_class,
-            num_features, num_targets,
+            num_features, num_targets, seed=args.seed,
             verbose=args.verbose, batch_size=128, n_trials=args.n_trials, use_mc_cv=True, n_replicates=20, train_percent=args.train_percent
         )
         # Save best parameters

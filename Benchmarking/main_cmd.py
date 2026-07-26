@@ -1,93 +1,97 @@
-"""Main file to run the complete workflow: hyperparameter optimization (optional), training, and plotting for all model combinations."""
+"""Launcher for HPO training jobs, one per (wrapper, model, dataset, train_percent)
+combination. Designed to be invoked once per SLURM array task via --job-index
+(see mc_hpo_launch.sh), the same pattern used in mc_replicate_diagnostic.py/.sh.
+"""
 import subprocess
 import sys
 import argparse
-from evaluations.plotters_new import run_plotting
 
-# Model combinations to test: (wrapper, model)
+
 MODEL_COMBINATIONS = [
-    ('SVGPModel', 'GP_Wrapper'), 
+    ('GP_Wrapper', 'SVGPModel'),
 ]
 
 DATASETS = ['Combined_Cycle_Power_Plant', 'Cpu_Act', 'Ailerons', 'Houses_OpenML', 'Elevators', 'Pol_OpenML']
-n = 1
-seed_list = [n, n+1, n+2, n+3, n+4, n+5, n+6, n+7, n+8, n+9]  # Seeds for reproducibility
+
+# 10% to 100% in increments of 10%
+TRAIN_PERCENTS = list(range(10, 101, 10))
+
+
+DEFAULT_SEED = 1
+
+
+def build_combinations():
+    """Flatten (wrapper, model) x dataset x train_percent into one indexable list.
+
+    Index order (slowest -> fastest varying): model combination, dataset, train_percent.
+    This is the order SLURM_ARRAY_TASK_ID will walk through.
+    """
+    combos = []
+    for wrapper, model in MODEL_COMBINATIONS:
+        for dataset in DATASETS:
+            for train_percent in TRAIN_PERCENTS:
+                combos.append((wrapper, model, dataset, train_percent))
+    return combos
+
 
 def parse_args():
-    """Parse command line arguments."""
     parser = argparse.ArgumentParser(
-        description='Train and compare model combinations'
-    )
-
-    parser.add_argument(
-        '--use-best',
-        type=str,
-        help='Use best hyperparameters from optimization. Provide path to JSON config file (e.g. best_params_and_all_results/best_parameters.json).'
+        description='Run a single HPO training job selected by index (for use with a SLURM job array).'
     )
     parser.add_argument(
-        '--optimize',
-        action='store_true',
-        help='Force run hyperparameter optimization instead of using saved best parameters'
+        '--job-index', type=int, required=True,
+        help='0-based index into the flattened combination list (pass $SLURM_ARRAY_TASK_ID here).'
+    )
+    parser.add_argument('--n-trials', type=int, default=100, help='Optuna trials per job (default: 100).')
+    parser.add_argument('--seed', type=int, default=DEFAULT_SEED, help='Seed passed to train.py.')
+    parser.add_argument(
+        '--list', action='store_true',
+        help='Print every (index, wrapper, model, dataset, train_percent) combo and exit '
+             '(use this to size --array, e.g. --array=0-N-1).'
     )
     return parser.parse_args()
 
 
-def run_training(combinations_to_run=None, use_best=None, optimize=False, dataset=None):
-    """Run training for specified model combinations."""
-    
-    for i, (wrapper, model), dataset_i, seed in combinations_to_run:
-        print(f"\n[{i}/{len(combinations_to_run)}] Training {wrapper} with {model} on {DATASETS[dataset_i]}")
-        print("-" * 80)
+def run_job(job_index, n_trials, seed):
+    combos = build_combinations()
+    if not (0 <= job_index < len(combos)):
+        print(f"job-index {job_index} out of range (valid: 0-{len(combos) - 1})")
+        sys.exit(1)
 
-        # Build execution command
-        cmd = [
-            sys.executable, "train.py",
-            "-d", DATASETS[dataset_i],
-            "-m", model,
-            "-w", wrapper,
-            "--seed", f"{seed + 102}",
-            "--train-percent", f"{seed*10}"
-        ]
+    wrapper, model, dataset, train_percent = combos[job_index]
+    print(f"[job {job_index}/{len(combos) - 1}] {wrapper} + {model} on {dataset} "
+          f"@ train_percent={train_percent}%")
 
-        if optimize:
-            cmd.append("--optimize")
-        else:
-            # If use_best was explicitly provided as a custom path, use it.
-            # Otherwise, default to the standard best parameters JSON file.
-            best_path = use_best if use_best is not None else "best_params_and_all_results/best_parameters.json"
-            cmd.extend(["--use-best", best_path])
+    cmd = [
+        sys.executable, "train.py",
+        "-d", dataset,
+        "-m", model,
+        "-w", wrapper,
+        "--seed", str(seed),
+        "--train-percent", str(train_percent),
+        "--optimize",
+        "--n-trials", str(n_trials),
+    ]
 
-        try:
-            result = subprocess.run(cmd, check=True)
-            if result.returncode != 0:
-                print(f"Warning: Training command returned non-zero exit code: {result.returncode}")
-        except subprocess.CalledProcessError as error:
-            print(f"Error: Training failed for {wrapper} + {model}")
-            print(f"Exit code: {error.returncode}")
-            return False
-    
-    return True
+    result = subprocess.run(cmd)
+    if result.returncode != 0:
+        print(f"Error: job {job_index} ({wrapper}+{model} on {dataset} @ {train_percent}%) "
+              f"exited with code {result.returncode}")
+        sys.exit(result.returncode)
 
 
 def main():
-    """Execute the complete workflow."""
     args = parse_args()
-    
-    # Determine which combinations to run
-    combinations_to_run = [(i, combo, dataset_i, seed) for i, combo in enumerate(MODEL_COMBINATIONS, 1) for dataset_i in range(len(DATASETS)) for seed in seed_list]
-    
-    print("\nWorkflow Summary:")
-    print(f"Dataset: {DATASETS[0]}")
-    print(f"Model combinations to train: {len(combinations_to_run)}")
-    for idx, (wrapper, model), dataset_i, seed in combinations_to_run:
-        print(f"  [{idx}] {wrapper} + {model} on {DATASETS[dataset_i]} with seed {seed}")
 
-    # Run training
-    if not run_training(combinations_to_run, use_best=args.use_best, optimize=args.optimize):
-        print("\nWorkflow failed during training phase.")
-        sys.exit(1)
+    if args.list:
+        combos = build_combinations()
+        for i, (wrapper, model, dataset, tp) in enumerate(combos):
+            print(f"{i}\t{wrapper}\t{model}\t{dataset}\ttrain_percent={tp}")
+        print(f"\nTotal combinations: {len(combos)}  (use --array=0-{len(combos) - 1})")
+        return
+
+    run_job(args.job_index, args.n_trials, args.seed)
 
 
 if __name__ == "__main__":
     main()
-    run_plotting(pms=True)
