@@ -74,8 +74,8 @@ Examples:
     parser.add_argument(
         '--n-trials',
         type=int,
-        default=10,
-        help='Number of Optuna trials (default: 48)'
+        default=100,
+        help='Number of Optuna trials (default: 100)'
     )
     
     parser.add_argument(
@@ -137,6 +137,7 @@ def get_model_label(wrapper, model):
         'MVE_Ensemble_Averaged': 'MEA',
         'MVE_Ensemble_Multiplicative': 'MEM',
         'MLP_Ensemble': 'MLP',
+        'GP_Wrapper': 'GP',
     }
     model_map = {
         'MVE_Default': 'MD',
