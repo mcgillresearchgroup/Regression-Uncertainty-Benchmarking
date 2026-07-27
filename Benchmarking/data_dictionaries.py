@@ -1,10 +1,21 @@
-from sklearn.preprocessing import OneHotEncoder
+
 from ucimlrepo import fetch_ucirepo 
 import pandas as pd
 from abc import ABC, abstractmethod
 import datetime as dt
 import openml as om
 from sklearn.datasets import fetch_openml
+import pickle
+import os
+import tempfile
+from pathlib import Path
+
+# Where fetched datasets are cached to disk. Sweeps launch many parallel jobs that mostly
+# request the same handful of datasets -- without a cache, each job re-downloads from
+# UCI/OpenML independently, which is slow and, under enough concurrency, gets you rate
+# limited / times out (HTTP 504) on the remote API.
+CACHE_DIR = Path(__file__).resolve().parent / 'dataset_cache'
+
 
 class Dataset(ABC):
     """Base class for datasets."""
@@ -12,14 +23,56 @@ class Dataset(ABC):
     id = None
     source = None
     
+    def _cache_key(self):
+        """Unique key for this dataset instance. Includes any instance-level variant
+        (e.g. WineQuality's wine_color) so different variants of the same id don't collide."""
+        variant = getattr(self, 'wine_color', None)
+        if variant:
+            return f"{self.source}_{self.id}_{variant}"
+        return f"{self.source}_{self.id}"
+
+    def _cache_path(self):
+        return CACHE_DIR / f"{self._cache_key()}.pkl"
+
+    def _load_from_cache(self):
+        path = self._cache_path()
+        if not path.exists():
+            return None
+        try:
+            with open(path, 'rb') as f:
+                return pickle.load(f)
+        except Exception as e:
+            print(f"Warning: failed to read dataset cache at {path} ({e}); re-fetching.")
+            return None
+
+    def _save_to_cache(self, result):
+        CACHE_DIR.mkdir(parents=True, exist_ok=True)
+        path = self._cache_path()
+        # Write to a temp file in the same dir then atomically rename, so a job reading the
+        # cache never sees a partially-written file if two jobs race to populate it.
+        try:
+            fd, tmp_path = tempfile.mkstemp(dir=CACHE_DIR, prefix='.tmp_', suffix='.pkl')
+            with os.fdopen(fd, 'wb') as f:
+                pickle.dump(result, f)
+            os.replace(tmp_path, path)
+        except Exception as e:
+            print(f"Warning: failed to write dataset cache at {path} ({e}); continuing without caching.")
+
     def load(self):
         """Unified entry point called by the framework loader."""
+        cached = self._load_from_cache()
+        if cached is not None:
+            return cached
+
         if self.source == 'uci':
-            return self.load_uci()
+            result = self.load_uci()
         elif self.source == 'openml':
-            return self.load_openml()
+            result = self.load_openml()
         else:
             raise ValueError(f"Unknown data source: {self.source}")
+
+        self._save_to_cache(result)
+        return result
 
     def load_uci(self):
         """Utility fallback to load dataset from UCI repo."""
@@ -74,45 +127,6 @@ class WineQuality(Dataset):
         return data_x, data_y, data_x.shape[1], data_y.shape[1] if len(data_y.shape) > 1 else 1
 
 
-class AppliancesEnergyPrediction(Dataset):
-    """Appliances Energy Prediction dataset."""
-    name = 'Appliances Energy Prediction'
-    id = 374
-    def load_uci(self):
-        """Load Appliances Energy Prediction dataset."""
-        #try: 
-        dataset = fetch_ucirepo(id=self.id)
-        data_x = dataset.data.features
-        datetime_data = pd.to_datetime(data_x['date'], format='%Y-%m-%d%H:%M:%S')
-        data_x.drop(columns=['date'], inplace=True)
-        jan_first = dt.date(datetime_data[0].year, 1, 1)
-        data_x['days_since_jan1'] = (datetime_data - pd.to_datetime(jan_first)).dt.days
-        data_x['hours_since_midnight'] = datetime_data.dt.hour + datetime_data.dt.minute / 60
-        data_x = pd.concat([data_x, pd.DataFrame(OneHotEncoder(sparse_output=False).fit_transform(datetime_data.dt.weekday.to_frame()), columns=[f'weekday_{i}' for i in range(7)])], axis=1)
-        data_y = dataset.data.targets
-        return data_x, data_y, data_x.shape[1], data_y.shape[1] if len(data_y.shape) > 1 else 1
-
-
-class RTIoT2022(Dataset):
-    """RT-IoT2022 (RT-IoT) dataset."""
-    name = 'RT-IoT2022'
-    id = 942
-    def load_uci(self):
-        """Load RT-IoT2022 dataset."""
-        dataset = fetch_ucirepo(id=self.id)
-        data_x = dataset.data.features
-        proto_data = data_x['proto']
-        data_x.drop(columns=['proto'], inplace=True)
-        data_x = pd.concat([data_x, pd.DataFrame(OneHotEncoder(sparse_output=False).fit_transform(proto_data.to_frame()), columns=[f'proto_{i}' for i in range(proto_data.nunique())])], axis=1)
-        service_data = data_x['service']
-        data_x.drop(columns=['service'], inplace=True)
-        data_x = pd.concat([data_x, pd.DataFrame(OneHotEncoder(sparse_output=False).fit_transform(service_data.to_frame()), columns=[f'service_{i}' for i in range(service_data.nunique())])], axis=1)
-        data_y = dataset.data.targets
-        attack_type = data_y['Attack_type']
-        data_y.drop(columns=['Attack_type'], inplace=True)
-        #One hot encode attack type and concatenate with features
-        data_y = pd.concat([data_y, pd.DataFrame(OneHotEncoder(sparse_output=False).fit_transform(attack_type.to_frame()), columns=[f'attack_type_{i}' for i in range(attack_type.nunique())])], axis=1)
-        return data_x, data_y, data_x.shape[1], data_y.shape[1] if len(data_y.shape) > 1 else 1
 
 
 class ConcreteCompressiveStrength(Dataset):

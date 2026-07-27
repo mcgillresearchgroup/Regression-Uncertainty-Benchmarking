@@ -6,6 +6,7 @@ import numpy as np
 import warnings
 import gc
 import inspect
+import gpytorch
 from sklearn.preprocessing import StandardScaler, RobustScaler
 from sklearn.base import BaseEstimator, RegressorMixin
 from sklearn.model_selection import KFold
@@ -149,29 +150,58 @@ class Default_Wrapper(ABC):
                 torch.cuda.empty_cache()
             gc.collect()
 
-    def cross_validate(self, X, y, n_splits=10):
+    def cross_validate(self, X, y, n_splits=10, train_percent=100, subsample_seed=67):
         """Perform cross-validation and return metrics.
         Inputs:
             X: Input features
             y: Target values
             n_splits: Number of cross-validation folds
+            train_percent: Percentage (0-100] of each fold's TRAINING portion to actually
+                train on. The validation portion is never subsampled, so folds stay
+                comparable across different train_percent values and metrics reflect model
+                quality, not a smaller/noisier validation set. Default 100 trains on the
+                full training portion of each fold (previous behavior).
+            subsample_seed: Seed for the train_percent subsampling (varied per fold so
+                different folds don't all keep the exact same relative subset).
         Returns:
             mean_pred: Mean predictions across folds
-            var_pred: Variance predictions across folds (if output_variance == True: returns variance, else: returns None)"""
-        
+            var_pred: Variance predictions across folds (if output_variance == True: returns variance, else: returns None)
+
+        A fold that raises during fit/predict (e.g. a rare numerical instability such as
+        gpytorch's NotPSDError) is logged and skipped rather than crashing the whole run,
+        so one bad fold doesn't cost every other fold's results. Raises if every fold fails.
+        """
+
         kf = KFold(n_splits=n_splits, shuffle=True, random_state=67)
         mean_preds = []
         var_preds = []
         y_true = []
+        failed_folds = []
         for fold_idx, (train_idx, val_idx) in enumerate(kf.split(X)):
+            if train_percent < 100:
+                rng = np.random.RandomState(subsample_seed + fold_idx)
+                train_size = max(1, int(len(train_idx) * (train_percent / 100)))
+                train_idx = rng.choice(train_idx, size=train_size, replace=False)
+
             X_train, X_val = X.iloc[train_idx], X.iloc[val_idx]
             y_train, y_val = y.iloc[train_idx], y.iloc[val_idx]
-            
-            self.fit(X_train, y_train)
-            mean_pred, var_pred = self.predict(X_val)
+
+            try:
+                self.fit(X_train, y_train)
+                mean_pred, var_pred = self.predict(X_val)
+            except Exception as e:
+                print(f"Warning: fold {fold_idx} failed ({e}); skipping this fold.")
+                failed_folds.append(fold_idx)
+                continue
+
             mean_preds.append(mean_pred)
             var_preds.append(var_pred)
             y_true.append(y_val)
+
+        if not mean_preds:
+            raise RuntimeError(f"All {n_splits} cross-validation folds failed; no results to return.")
+        if failed_folds:
+            print(f"Warning: {len(failed_folds)}/{n_splits} folds failed and were skipped: {failed_folds}")
 
         mean_pred = np.concatenate(mean_preds, axis=0)
         var_pred = np.concatenate(var_preds, axis=0) if self.output_variance else None
@@ -405,6 +435,7 @@ class GP_Wrapper(Default_Wrapper):
             lr=lr, epochs=epochs, batch_size=batch_size
         )
         self.num_inducing = num_inducing
+        self.kwargs = kwargs
         self.output_variance = True
         self.likelihood = gpytorch.likelihoods.GaussianLikelihood().to(self.device)
 
@@ -447,8 +478,15 @@ class GP_Wrapper(Default_Wrapper):
             epoch_loss = 0.0
             for x_batch, y_batch in train_loader:
                 optimizer.zero_grad()
-                output = model(x_batch)
-                loss = -mll(output, y_batch)
+                # Randomly-sampled inducing points can occasionally end up near-duplicate
+                # (especially on datasets with many repeated/discretized feature values),
+                # which makes the inducing-point covariance matrix ill-conditioned. The
+                # default jitter ceiling (~1e-6) and retry budget are too tight for that;
+                # widen both so a marginally-singular matrix doesn't crash the whole job.
+                with gpytorch.settings.cholesky_jitter(float_value=1e-3), \
+                     gpytorch.settings.cholesky_max_tries(10):
+                    output = model(x_batch)
+                    loss = -mll(output, y_batch)
                 loss.backward()
                 optimizer.step()
                 epoch_loss += loss.item()
@@ -474,7 +512,9 @@ class GP_Wrapper(Default_Wrapper):
         self.likelihood = self.likelihood.to(self.device)
         
 
-        with torch.inference_mode():
+        with torch.inference_mode(), \
+             gpytorch.settings.cholesky_jitter(float_value=1e-3), \
+             gpytorch.settings.cholesky_max_tries(10):
             predictions = self.likelihood(model(X_tensor))
             y_pred = predictions.mean.cpu().numpy().reshape(-1, self.num_targets)
             y_var = (predictions.stddev.cpu().numpy() ** 2).reshape(-1, self.num_targets)

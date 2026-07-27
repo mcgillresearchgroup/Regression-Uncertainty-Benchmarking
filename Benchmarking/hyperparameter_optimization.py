@@ -27,11 +27,21 @@ def initialize_model(wrapper_class, base_class, num_features, num_targets, **hyp
             n_models, batch_size, mean_head_n_layers, mean_head_layer_size, etc). Entries that
             wrapper_class's __init__ doesn't accept are dropped automatically, so this can be
             called with a full hyperparameters dict (e.g. from load_best_parameters) even if it
-            contains keys that only apply to a different wrapper/base combination.
+            contains keys that only apply to a different wrapper/base combination. If
+            wrapper_class's __init__ accepts **kwargs (e.g. GP_Wrapper, which passes extras like
+            inducing_fraction through), nothing is filtered out -- inspect.signature only exposes
+            the catch-all parameter name, not the individual keys it will accept.
     """
     accepted_params = inspect.signature(wrapper_class.__init__).parameters
-    filtered_hyperparameters = {k: v for k, v in hyperparameters.items() if k in accepted_params}
-    extra_params = {k: v for k, v in hyperparameters.items() if k not in accepted_params}
+    accepts_var_kwargs = any(
+        p.kind == inspect.Parameter.VAR_KEYWORD for p in accepted_params.values()
+    )
+    if accepts_var_kwargs:
+        filtered_hyperparameters = dict(hyperparameters)
+        extra_params = {}
+    else:
+        filtered_hyperparameters = {k: v for k, v in hyperparameters.items() if k in accepted_params}
+        extra_params = {k: v for k, v in hyperparameters.items() if k not in accepted_params}
     if len(extra_params) > 0:
         raise KeyError(f"Warning: Ignoring extra hyperparameters not accepted by {wrapper_class.__name__}: {list(extra_params.keys())}")
     return wrapper_class(
@@ -211,8 +221,11 @@ def save_best_parameters(best_params, dataset, wrapper_name, model_name, train_p
     else:
         all_params = {}
     
-    # Create unique key
-    key = f"{dataset}_{wrapper_name}_{model_name}"
+    # Create unique key. train_percent is part of the key (not just stored in the entry)
+    # because different train_percent runs for the same dataset/wrapper/model are distinct
+    # experiments with their own best hyperparameters -- without it, only the single
+    # train_percent with the lowest NLL would ever survive in this file.
+    key = f"{dataset}_{wrapper_name}_{model_name}_tp{train_percent}"
     
     # Check if key exists and if we should skip based on NLL comparison
     if key in all_params and best_nll is not None:
@@ -245,9 +258,16 @@ def save_best_parameters(best_params, dataset, wrapper_name, model_name, train_p
     print(f"Key: {key}")
 
 
-def load_best_parameters(dataset, wrapper_name, model_name, filepath=None):
+def load_best_parameters(dataset, wrapper_name, model_name, train_percent=None, filepath=None):
     """Load best hyperparameters from JSON file.
-    
+
+    Args:
+        train_percent: If given, looks up the entry saved for this specific train_percent
+            (the current key format). If that's not found, falls back to the old
+            pre-train_percent key for backward compatibility with files saved before this
+            change, and prints a note that the loaded params weren't specific to this
+            train_percent.
+
     Returns the parameters dict, handling both old flat format and new nested format.
     """
     if filepath is None:
@@ -260,8 +280,18 @@ def load_best_parameters(dataset, wrapper_name, model_name, filepath=None):
 
     with open(filepath, 'r') as f:
         all_params = json.load(f)
-    key = f"{dataset}_{wrapper_name}_{model_name}"
-    entry = all_params.get(key, None)
+
+    old_key = f"{dataset}_{wrapper_name}_{model_name}"
+    entry = None
+    if train_percent is not None:
+        new_key = f"{old_key}_tp{train_percent}"
+        entry = all_params.get(new_key, None)
+        if entry is None and old_key in all_params:
+            print(f"Note: no entry for {new_key}; falling back to legacy key {old_key} "
+                  f"(not specific to train_percent={train_percent}).")
+            entry = all_params.get(old_key, None)
+    else:
+        entry = all_params.get(old_key, None)
 
     if entry is None:
         return None

@@ -95,7 +95,7 @@ def main():
     elif args.use_best is not None:
         # Try to load best parameters
         print(f"Loading best parameters from: {args.use_best}")
-        hp = load_best_parameters(args.dataset, args.wrapper, args.base, filepath=args.use_best)
+        hp = load_best_parameters(args.dataset, args.wrapper, args.base, train_percent=args.train_percent, filepath=args.use_best)
         if hp is None:
             print(f"No saved hyperparameters found for {args.dataset}/{args.wrapper}/{args.base} in {args.use_best}.")
             sys.exit(1)
@@ -104,17 +104,28 @@ def main():
     # Create model wrapper with selected hyperparameters and run a cross validation training to get final metrics
     # initialize_model drops any hp entries that wrapper_class doesn't accept (e.g. mean_head_*
     # params when base_class isn't MVE_Mean_Head_Extension), so hp can be passed through as-is.
+    # We force a fixed batch_size for this final full-data training/eval step regardless of
+    # whatever batch_size (if any) HPO tuned -- set it on the dict rather than passing it as a
+    # separate keyword, since some wrappers (e.g. GP_Wrapper) tune batch_size themselves and
+    # `**hp, batch_size=...` would otherwise pass it twice.
+    final_batch_size = 128 * 4
+    hp_for_final_training = {**hp, 'batch_size': final_batch_size}
     model_wrapper = initialize_model(
         wrapper_class, base_class, num_features, num_targets,
-        **hp, batch_size=128 * 4
+        **hp_for_final_training
     )
-    print(f"Batch Size: {128*4}")
+    print(f"Batch Size: {final_batch_size}")
     cross_evaluation_folds = 10
-    mean_pred, var_pred, y_true = model_wrapper.cross_validate(X, y, n_splits=cross_evaluation_folds)
+    mean_pred, var_pred, y_true = model_wrapper.cross_validate(
+        X, y, n_splits=cross_evaluation_folds, train_percent=args.train_percent
+    )
 
     # Save results
     results_dir = Path('./best_params_and_all_results')
-    filename, metrics, nll = save_results(results_dir, args.dataset, args.wrapper, args.base, mean_pred, var_pred, y_true, hyperparameters=hp)
+    filename, metrics, nll = save_results(
+        results_dir, args.dataset, args.wrapper, args.base, mean_pred, var_pred, y_true,
+        hyperparameters=hp, train_percent=args.train_percent
+    )
      
     if args.verbose:
         print("Model Metrics:")

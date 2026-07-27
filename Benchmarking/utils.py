@@ -38,6 +38,7 @@ Examples:
     parser.add_argument(
         '-m', '--model',
         type=str,
+        dest='base',
         required=True,
         choices=BASES,
         help=f'Base architecture. Options: {", ".join(BASES)}'
@@ -154,7 +155,7 @@ def negative_log_likelihood(y_true, y_pred_mean, y_pred_var, eps=1e-6):
     return np.mean(nll)
 
 # Add in the saving of the params used in the save results function, so that we can easily track which hyperparameters were used for each result file.
-def save_results(results_dir, dataset_name, wrapper_name, base_name, mean_pred, var_pred, y_test, hyperparameters=None):
+def save_results(results_dir, dataset_name, wrapper_name, base_name, mean_pred, var_pred, y_test, hyperparameters=None, train_percent=None):
     """Save model predictions and metrics to file."""
     results_dir = Path(results_dir)
     results_dir.mkdir(exist_ok=True)
@@ -163,22 +164,25 @@ def save_results(results_dir, dataset_name, wrapper_name, base_name, mean_pred, 
     mse = mean_squared_error(y_test, mean_pred)
     mae = mean_absolute_error(y_test, mean_pred)
     r2 = r2_score(y_test, mean_pred)
-    var_pred_clipped = np.clip(var_pred, min=1e-6, max=1e6)
+    var_pred_clipped = np.clip(var_pred, a_min=1e-6, a_max=1e6)
     nll = negative_log_likelihood(y_test, mean_pred, var_pred_clipped)
     
     mean_list = mean_pred.flatten().tolist()
     var_list = var_pred.flatten().tolist()
     y_true_array = np.asarray(y_test).flatten()
     y_true_list = y_true_array.tolist()
-    # Create filename
+    # Create filename. train_percent is included so results from a train_percent sweep are
+    # identifiable and sortable from the filename alone, without opening every JSON file.
     timestamp = pd.Timestamp.now().strftime('%Y%m%d_%H%M%S')
-    filename = results_dir / f"{dataset_name}_{wrapper_name}_{base_name}_{timestamp}.json"
+    tp_suffix = f"_tp{train_percent}" if train_percent is not None else ""
+    filename = results_dir / f"{dataset_name}_{wrapper_name}_{base_name}{tp_suffix}_{timestamp}.json"
     
     # Prepare results
     results = {
         'dataset': dataset_name,
         'base': base_name,
         'wrapper': wrapper_name,
+        'train_percent': train_percent,
         'timestamp': timestamp,
         'hyperparameters': {hyper: value for hyper, value in (hyperparameters or {}).items()},
         'metrics': {
