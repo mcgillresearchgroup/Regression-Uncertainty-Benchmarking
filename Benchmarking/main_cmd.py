@@ -9,11 +9,8 @@ import json
 from pathlib import Path
 from datetime import datetime, timezone
 
-# Model combinations to test: (wrapper, model)
-# NOTE: fixed ordering vs. the old file -- SVGPModel is the base/model (base_list_dict),
-# GP_Wrapper is the wrapper (wrapper_list_dict). train.py expects -w <wrapper> -m <model>.
 MODEL_COMBINATIONS = [
-    ('GP_Wrapper', 'SVGPModel'),
+    ('MVE_Ensemble_Averaged', 'MVE_Default'),
 ]
 
 DATASETS = ['Combined_Cycle_Power_Plant', 'Cpu_Act', 'Ailerons', 'Houses_OpenML', 'Elevators', 'Pol_OpenML']

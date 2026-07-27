@@ -53,6 +53,7 @@ class Default_Wrapper(ABC):
         self.batch_size = batch_size  # None = full batch, int = mini-batch size
         self.mean_head_n_layers = mean_head_n_layers
         self.mean_head_layer_size = mean_head_layer_size
+        self.output_variance = base_list_dict.get(self.base_class.__name__, [None, False])[1]
         self.x_scaler = RobustScaler()
         self.y_scaler = RobustScaler()
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')

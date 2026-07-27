@@ -90,7 +90,7 @@ Examples:
         '--seed',
         type=int,
         default=420,
-        help='Random seed used if hyperparameter optimization is not run (default: 42)'
+        help='Random seed used if hyperparameter optimization is not run (default: 420)'
     )
     
     parser.add_argument(
