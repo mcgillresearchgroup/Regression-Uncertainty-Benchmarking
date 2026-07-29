@@ -1,0 +1,145 @@
+{
+    "Concrete_Compressive_Strength_MVE_Ensemble_Averaged_MVE_Default": {
+        "dataset": "Concrete_Compressive_Strength",
+        "wrapper": "MVE_Ensemble_Averaged",
+        "model": "MVE_Default",
+        "hyperparameters": {
+            "lr": 0.0010243196265020409,
+            "epochs": 160,
+            "n_layers": 6,
+            "layer_size": 72,
+            "n_models": 10
+        },
+        "best_nll": 4.076122319803432
+    },
+    "Appliances_Energy_Prediction_MVE_Ensemble_Averaged_MVE_Default": {
+        "dataset": "Appliances_Energy_Prediction",
+        "wrapper": "MVE_Ensemble_Averaged",
+        "model": "MVE_Default",
+        "hyperparameters": {
+            "lr": 0.001751103577844246,
+            "epochs": 160,
+            "n_layers": 6,
+            "layer_size": 24,
+            "n_models": 5
+        },
+        "best_nll": 5.087966006766419
+    },
+    "Red_Wine_Quality_MVE_Ensemble_Averaged_MVE_Default": {
+        "dataset": "Red_Wine_Quality",
+        "wrapper": "MVE_Ensemble_Averaged",
+        "model": "MVE_Default",
+        "hyperparameters": {
+            "lr": 0.007229706435025275,
+            "epochs": 100,
+            "n_layers": 8,
+            "layer_size": 88,
+            "n_models": 10
+        },
+        "best_nll": 0.9237825575279576
+    },
+    "White_Wine_Quality_MVE_Ensemble_Averaged_MVE_Default": {
+        "dataset": "White_Wine_Quality",
+        "wrapper": "MVE_Ensemble_Averaged",
+        "model": "MVE_Default",
+        "hyperparameters": {
+            "lr": 9.58113958729466e-05,
+            "epochs": 180,
+            "n_layers": 6,
+            "layer_size": 72,
+            "n_models": 10
+        },
+        "best_nll": 1.0291404817342555
+    },
+    "Combined_Cycle_Power_Plant_MVE_Ensemble_Averaged_MVE_Default": {
+        "dataset": "Combined_Cycle_Power_Plant",
+        "wrapper": "MVE_Ensemble_Averaged",
+        "model": "MVE_Default",
+        "hyperparameters": {
+            "lr": 0.0035222278219755165,
+            "epochs": 200,
+            "n_layers": 4,
+            "layer_size": 120,
+            "n_models": 1
+        },
+        "best_nll": 2.7241473226992396
+    },
+    "Cpu_Act_GP_Wrapper_SVGPModel": {
+        "dataset": "Cpu_Act",
+        "wrapper": "GP_Wrapper",
+        "model": "SVGPModel",
+        "train_percent": 60.0,
+        "hyperparameters": {
+            "lr": 0.05333810006792028,
+            "epochs": 100,
+            "batch_size": 128,
+            "inducing_fraction": 0.14626949721800742
+        },
+        "best_nll": 2.50806252930197
+    },
+    "Combined_Cycle_Power_Plant_GP_Wrapper_SVGPModel": {
+        "dataset": "Combined_Cycle_Power_Plant",
+        "wrapper": "GP_Wrapper",
+        "model": "SVGPModel",
+        "train_percent": 70.0,
+        "hyperparameters": {
+            "lr": 0.0016773915205396182,
+            "epochs": 100,
+            "batch_size": 128,
+            "inducing_fraction": 0.11290526296451449
+        },
+        "best_nll": 2.826403467548899
+    },
+    "Pol_OpenML_GP_Wrapper_SVGPModel": {
+        "dataset": "Pol_OpenML",
+        "wrapper": "GP_Wrapper",
+        "model": "SVGPModel",
+        "train_percent": 60.0,
+        "hyperparameters": {
+            "lr": 0.027711086014431258,
+            "epochs": 90,
+            "batch_size": 768,
+            "inducing_fraction": 0.1381466726448438
+        },
+        "best_nll": 3.144609179398512
+    },
+    "Houses_OpenML_GP_Wrapper_SVGPModel": {
+        "dataset": "Houses_OpenML",
+        "wrapper": "GP_Wrapper",
+        "model": "SVGPModel",
+        "train_percent": 40.0,
+        "hyperparameters": {
+            "lr": 0.023827947414655798,
+            "epochs": 90,
+            "batch_size": 1664,
+            "inducing_fraction": 0.14649399316913267
+        },
+        "best_nll": 0.07030234103473072
+    },
+    "Elevators_GP_Wrapper_SVGPModel": {
+        "dataset": "Elevators",
+        "wrapper": "GP_Wrapper",
+        "model": "SVGPModel",
+        "train_percent": 40.0,
+        "hyperparameters": {
+            "lr": 0.035222278219755175,
+            "epochs": 100,
+            "batch_size": 896,
+            "inducing_fraction": 0.1454488125108665
+        },
+        "best_nll": -4.725547549234215
+    },
+    "Ailerons_GP_Wrapper_SVGPModel": {
+        "dataset": "Ailerons",
+        "wrapper": "GP_Wrapper",
+        "model": "SVGPModel",
+        "train_percent": 60.0,
+        "hyperparameters": {
+            "lr": 0.06480420224033027,
+            "epochs": 90,
+            "batch_size": 1664,
+            "inducing_fraction": 0.10772449858328448
+        },
+        "best_nll": -5.975741773582633
+    }
+}

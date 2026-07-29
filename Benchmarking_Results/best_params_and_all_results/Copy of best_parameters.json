@@ -1,0 +1,487 @@
+{
+    "Concrete_Compressive_Strength_MVE_Ensemble_Averaged_MVE_Default": {
+        "dataset": "Concrete_Compressive_Strength",
+        "wrapper": "MVE_Ensemble_Averaged",
+        "model": "MVE_Default",
+        "hyperparameters": {
+            "lr": 0.0010243196265020409,
+            "epochs": 160,
+            "n_layers": 6,
+            "layer_size": 72,
+            "n_models": 10
+        },
+        "best_nll": 4.076122319803432
+    },
+    "Appliances_Energy_Prediction_MVE_Ensemble_Averaged_MVE_Default": {
+        "dataset": "Appliances_Energy_Prediction",
+        "wrapper": "MVE_Ensemble_Averaged",
+        "model": "MVE_Default",
+        "hyperparameters": {
+            "lr": 0.001751103577844246,
+            "epochs": 160,
+            "n_layers": 6,
+            "layer_size": 24,
+            "n_models": 5
+        },
+        "best_nll": 5.087966006766419
+    },
+    "Red_Wine_Quality_MVE_Ensemble_Averaged_MVE_Default": {
+        "dataset": "Red_Wine_Quality",
+        "wrapper": "MVE_Ensemble_Averaged",
+        "model": "MVE_Default",
+        "hyperparameters": {
+            "lr": 0.007229706435025275,
+            "epochs": 100,
+            "n_layers": 8,
+            "layer_size": 88,
+            "n_models": 10
+        },
+        "best_nll": 0.9237825575279576
+    },
+    "White_Wine_Quality_MVE_Ensemble_Averaged_MVE_Default": {
+        "dataset": "White_Wine_Quality",
+        "wrapper": "MVE_Ensemble_Averaged",
+        "model": "MVE_Default",
+        "hyperparameters": {
+            "lr": 9.58113958729466e-05,
+            "epochs": 180,
+            "n_layers": 6,
+            "layer_size": 72,
+            "n_models": 10
+        },
+        "best_nll": 1.0291404817342555
+    },
+    "Combined_Cycle_Power_Plant_MVE_Ensemble_Averaged_MVE_Default": {
+        "dataset": "Combined_Cycle_Power_Plant",
+        "wrapper": "MVE_Ensemble_Averaged",
+        "model": "MVE_Default",
+        "hyperparameters": {
+            "lr": 0.0035222278219755165,
+            "epochs": 200,
+            "n_layers": 4,
+            "layer_size": 120,
+            "n_models": 1
+        },
+        "best_nll": 2.7241473226992396
+    },
+    "Ailerons_MVE_Ensemble_Averaged_MVE_Default_tp20.0": {
+        "dataset": "Ailerons",
+        "wrapper": "MVE_Ensemble_Averaged",
+        "model": "MVE_Default",
+        "train_percent": 20.0,
+        "hyperparameters": {
+            "lr": 0.0029515571851501552,
+            "epochs": 160,
+            "n_layers": 3,
+            "layer_size": 24,
+            "batch_size": 1280
+        },
+        "best_nll": -5.9755472289594405
+    },
+    "Elevators_MVE_Ensemble_Averaged_MVE_Default_tp20.0": {
+        "dataset": "Elevators",
+        "wrapper": "MVE_Ensemble_Averaged",
+        "model": "MVE_Default",
+        "train_percent": 20.0,
+        "hyperparameters": {
+            "lr": 0.0077759595199889805,
+            "epochs": 160,
+            "n_layers": 3,
+            "layer_size": 16,
+            "batch_size": 1408
+        },
+        "best_nll": -4.883092603542641
+    },
+    "Ailerons_MVE_Ensemble_Averaged_MVE_Default_tp40.0": {
+        "dataset": "Ailerons",
+        "wrapper": "MVE_Ensemble_Averaged",
+        "model": "MVE_Default",
+        "train_percent": 40.0,
+        "hyperparameters": {
+            "lr": 0.0019725917610825994,
+            "epochs": 140,
+            "n_layers": 4,
+            "layer_size": 24,
+            "batch_size": 1536
+        },
+        "best_nll": -5.97572361995761
+    },
+    "Ailerons_MVE_Ensemble_Averaged_MVE_Default_tp60.0": {
+        "dataset": "Ailerons",
+        "wrapper": "MVE_Ensemble_Averaged",
+        "model": "MVE_Default",
+        "train_percent": 60.0,
+        "hyperparameters": {
+            "lr": 0.0050571807094360035,
+            "epochs": 180,
+            "n_layers": 3,
+            "layer_size": 40,
+            "batch_size": 1792
+        },
+        "best_nll": -5.975960055374608
+    },
+    "Combined_Cycle_Power_Plant_MVE_Ensemble_Averaged_MVE_Default_tp20.0": {
+        "dataset": "Combined_Cycle_Power_Plant",
+        "wrapper": "MVE_Ensemble_Averaged",
+        "model": "MVE_Default",
+        "train_percent": 20.0,
+        "hyperparameters": {
+            "lr": 0.005320938918568758,
+            "epochs": 200,
+            "n_layers": 5,
+            "layer_size": 24,
+            "batch_size": 384
+        },
+        "best_nll": 2.810422938950478
+    },
+    "Elevators_MVE_Ensemble_Averaged_MVE_Default_tp60.0": {
+        "dataset": "Elevators",
+        "wrapper": "MVE_Ensemble_Averaged",
+        "model": "MVE_Default",
+        "train_percent": 60.0,
+        "hyperparameters": {
+            "lr": 0.008564544476632636,
+            "epochs": 140,
+            "n_layers": 7,
+            "layer_size": 24,
+            "batch_size": 1408
+        },
+        "best_nll": -4.9382793692235385
+    },
+    "Ailerons_MVE_Ensemble_Averaged_MVE_Default_tp80.0": {
+        "dataset": "Ailerons",
+        "wrapper": "MVE_Ensemble_Averaged",
+        "model": "MVE_Default",
+        "train_percent": 80.0,
+        "hyperparameters": {
+            "lr": 0.00988512058264396,
+            "epochs": 140,
+            "n_layers": 3,
+            "layer_size": 24,
+            "batch_size": 1024
+        },
+        "best_nll": -5.97643413769269
+    },
+    "Elevators_MVE_Ensemble_Averaged_MVE_Default_tp40.0": {
+        "dataset": "Elevators",
+        "wrapper": "MVE_Ensemble_Averaged",
+        "model": "MVE_Default",
+        "train_percent": 40.0,
+        "hyperparameters": {
+            "lr": 0.008148356676084594,
+            "epochs": 140,
+            "n_layers": 4,
+            "layer_size": 16,
+            "batch_size": 768
+        },
+        "best_nll": -4.923343661206057
+    },
+    "Cpu_Act_MVE_Ensemble_Averaged_MVE_Default_tp20.0": {
+        "dataset": "Cpu_Act",
+        "wrapper": "MVE_Ensemble_Averaged",
+        "model": "MVE_Default",
+        "train_percent": 20.0,
+        "hyperparameters": {
+            "lr": 0.0037793096190342017,
+            "epochs": 140,
+            "n_layers": 5,
+            "layer_size": 16,
+            "batch_size": 1536
+        },
+        "best_nll": 2.4969224895330027
+    },
+    "Houses_OpenML_MVE_Ensemble_Averaged_MVE_Default_tp20.0": {
+        "dataset": "Houses_OpenML",
+        "wrapper": "MVE_Ensemble_Averaged",
+        "model": "MVE_Default",
+        "train_percent": 20.0,
+        "hyperparameters": {
+            "lr": 0.009727523457292978,
+            "epochs": 160,
+            "n_layers": 4,
+            "layer_size": 32,
+            "batch_size": 512
+        },
+        "best_nll": -0.05707094753104476
+    },
+    "Elevators_MVE_Ensemble_Averaged_MVE_Default_tp100.0": {
+        "dataset": "Elevators",
+        "wrapper": "MVE_Ensemble_Averaged",
+        "model": "MVE_Default",
+        "train_percent": 100.0,
+        "hyperparameters": {
+            "lr": 0.007284968514921038,
+            "epochs": 100,
+            "n_layers": 5,
+            "layer_size": 32,
+            "batch_size": 1664
+        },
+        "best_nll": -4.948034705110823
+    },
+    "Ailerons_MVE_Ensemble_Averaged_MVE_Default_tp100.0": {
+        "dataset": "Ailerons",
+        "wrapper": "MVE_Ensemble_Averaged",
+        "model": "MVE_Default",
+        "train_percent": 100.0,
+        "hyperparameters": {
+            "lr": 0.008122580638377699,
+            "epochs": 180,
+            "n_layers": 3,
+            "layer_size": 32,
+            "batch_size": 2048
+        },
+        "best_nll": -5.976492668320256
+    },
+    "Combined_Cycle_Power_Plant_MVE_Ensemble_Averaged_MVE_Default_tp40.0": {
+        "dataset": "Combined_Cycle_Power_Plant",
+        "wrapper": "MVE_Ensemble_Averaged",
+        "model": "MVE_Default",
+        "train_percent": 40.0,
+        "hyperparameters": {
+            "lr": 0.009993569845962775,
+            "epochs": 180,
+            "n_layers": 6,
+            "layer_size": 96,
+            "batch_size": 256
+        },
+        "best_nll": 2.7689469101615267
+    },
+    "Houses_OpenML_MVE_Ensemble_Averaged_MVE_Default_tp40.0": {
+        "dataset": "Houses_OpenML",
+        "wrapper": "MVE_Ensemble_Averaged",
+        "model": "MVE_Default",
+        "train_percent": 40.0,
+        "hyperparameters": {
+            "lr": 0.004297261219341358,
+            "epochs": 200,
+            "n_layers": 4,
+            "layer_size": 48,
+            "batch_size": 768
+        },
+        "best_nll": -0.10855048240321323
+    },
+    "Elevators_MVE_Ensemble_Averaged_MVE_Default_tp80.0": {
+        "dataset": "Elevators",
+        "wrapper": "MVE_Ensemble_Averaged",
+        "model": "MVE_Default",
+        "train_percent": 80.0,
+        "hyperparameters": {
+            "lr": 0.005021748506967277,
+            "epochs": 180,
+            "n_layers": 5,
+            "layer_size": 24,
+            "batch_size": 1536
+        },
+        "best_nll": -4.945609487972837
+    },
+    "Pol_OpenML_MVE_Ensemble_Averaged_MVE_Default_tp20.0": {
+        "dataset": "Pol_OpenML",
+        "wrapper": "MVE_Ensemble_Averaged",
+        "model": "MVE_Default",
+        "train_percent": 20.0,
+        "hyperparameters": {
+            "lr": 0.0008762937165315845,
+            "epochs": 200,
+            "n_layers": 8,
+            "layer_size": 16,
+            "batch_size": 128
+        },
+        "best_nll": 2.1695036387864133
+    },
+    "Cpu_Act_MVE_Ensemble_Averaged_MVE_Default_tp40.0": {
+        "dataset": "Cpu_Act",
+        "wrapper": "MVE_Ensemble_Averaged",
+        "model": "MVE_Default",
+        "train_percent": 40.0,
+        "hyperparameters": {
+            "lr": 0.0037793096190342017,
+            "epochs": 140,
+            "n_layers": 5,
+            "layer_size": 16,
+            "batch_size": 1536
+        },
+        "best_nll": 2.3738174150768394
+    },
+    "Cpu_Act_MVE_Ensemble_Averaged_MVE_Default_tp60.0": {
+        "dataset": "Cpu_Act",
+        "wrapper": "MVE_Ensemble_Averaged",
+        "model": "MVE_Default",
+        "train_percent": 60.0,
+        "hyperparameters": {
+            "lr": 0.0037793096190342017,
+            "epochs": 140,
+            "n_layers": 5,
+            "layer_size": 16,
+            "batch_size": 1536
+        },
+        "best_nll": 2.350065188976685
+    },
+    "Pol_OpenML_MVE_Ensemble_Averaged_MVE_Default_tp40.0": {
+        "dataset": "Pol_OpenML",
+        "wrapper": "MVE_Ensemble_Averaged",
+        "model": "MVE_Default",
+        "train_percent": 40.0,
+        "hyperparameters": {
+            "lr": 0.00106821444601502,
+            "epochs": 200,
+            "n_layers": 3,
+            "layer_size": 40,
+            "batch_size": 128
+        },
+        "best_nll": 1.5321190920843506
+    },
+    "Combined_Cycle_Power_Plant_MVE_Ensemble_Averaged_MVE_Default_tp60.0": {
+        "dataset": "Combined_Cycle_Power_Plant",
+        "wrapper": "MVE_Ensemble_Averaged",
+        "model": "MVE_Default",
+        "train_percent": 60.0,
+        "hyperparameters": {
+            "lr": 0.005680405151647148,
+            "epochs": 200,
+            "n_layers": 7,
+            "layer_size": 72,
+            "batch_size": 384
+        },
+        "best_nll": 2.712639917500737
+    },
+    "Cpu_Act_MVE_Ensemble_Averaged_MVE_Default_tp100.0": {
+        "dataset": "Cpu_Act",
+        "wrapper": "MVE_Ensemble_Averaged",
+        "model": "MVE_Default",
+        "train_percent": 100.0,
+        "hyperparameters": {
+            "lr": 0.0037793096190342017,
+            "epochs": 140,
+            "n_layers": 5,
+            "layer_size": 16,
+            "batch_size": 1536
+        },
+        "best_nll": 2.3069382503297056
+    },
+    "Combined_Cycle_Power_Plant_MVE_Ensemble_Averaged_MVE_Default_tp100.0": {
+        "dataset": "Combined_Cycle_Power_Plant",
+        "wrapper": "MVE_Ensemble_Averaged",
+        "model": "MVE_Default",
+        "train_percent": 100.0,
+        "hyperparameters": {
+            "lr": 0.007860405317949473,
+            "epochs": 200,
+            "n_layers": 5,
+            "layer_size": 88,
+            "batch_size": 256
+        },
+        "best_nll": 2.676300002506152
+    },
+    "Houses_OpenML_MVE_Ensemble_Averaged_MVE_Default_tp60.0": {
+        "dataset": "Houses_OpenML",
+        "wrapper": "MVE_Ensemble_Averaged",
+        "model": "MVE_Default",
+        "train_percent": 60.0,
+        "hyperparameters": {
+            "lr": 0.00652487532409007,
+            "epochs": 180,
+            "n_layers": 5,
+            "layer_size": 32,
+            "batch_size": 128
+        },
+        "best_nll": -0.16366232567699696
+    },
+    "Pol_OpenML_MVE_Ensemble_Averaged_MVE_Default_tp60.0": {
+        "dataset": "Pol_OpenML",
+        "wrapper": "MVE_Ensemble_Averaged",
+        "model": "MVE_Default",
+        "train_percent": 60.0,
+        "hyperparameters": {
+            "lr": 0.0006819130954678426,
+            "epochs": 200,
+            "n_layers": 5,
+            "layer_size": 32,
+            "batch_size": 128
+        },
+        "best_nll": 1.1284504463155087
+    },
+    "Pol_OpenML_MVE_Ensemble_Averaged_MVE_Default_tp80.0": {
+        "dataset": "Pol_OpenML",
+        "wrapper": "MVE_Ensemble_Averaged",
+        "model": "MVE_Default",
+        "train_percent": 80.0,
+        "hyperparameters": {
+            "lr": 0.0010499237840716057,
+            "epochs": 140,
+            "n_layers": 6,
+            "layer_size": 16,
+            "batch_size": 128
+        },
+        "best_nll": 1.292764221556646
+    },
+    "Houses_OpenML_MVE_Ensemble_Averaged_MVE_Default_tp80.0": {
+        "dataset": "Houses_OpenML",
+        "wrapper": "MVE_Ensemble_Averaged",
+        "model": "MVE_Default",
+        "train_percent": 80.0,
+        "hyperparameters": {
+            "lr": 0.0042805293380357235,
+            "epochs": 200,
+            "n_layers": 5,
+            "layer_size": 48,
+            "batch_size": 256
+        },
+        "best_nll": -0.2049299332858893
+    },
+    "Combined_Cycle_Power_Plant_MVE_Ensemble_Averaged_MVE_Default_tp80.0": {
+        "dataset": "Combined_Cycle_Power_Plant",
+        "wrapper": "MVE_Ensemble_Averaged",
+        "model": "MVE_Default",
+        "train_percent": 80.0,
+        "hyperparameters": {
+            "lr": 0.005069030172432436,
+            "epochs": 180,
+            "n_layers": 6,
+            "layer_size": 120,
+            "batch_size": 128
+        },
+        "best_nll": 2.6904264179308823
+    },
+    "Houses_OpenML_MVE_Ensemble_Averaged_MVE_Default_tp100.0": {
+        "dataset": "Houses_OpenML",
+        "wrapper": "MVE_Ensemble_Averaged",
+        "model": "MVE_Default",
+        "train_percent": 100.0,
+        "hyperparameters": {
+            "lr": 0.005057149312109248,
+            "epochs": 200,
+            "n_layers": 7,
+            "layer_size": 64,
+            "batch_size": 256
+        },
+        "best_nll": -0.24002793789850924
+    },
+    "Cpu_Act_MVE_Ensemble_Averaged_MVE_Default_tp80.0": {
+        "dataset": "Cpu_Act",
+        "wrapper": "MVE_Ensemble_Averaged",
+        "model": "MVE_Default",
+        "train_percent": 80.0,
+        "hyperparameters": {
+            "lr": 0.0037793096190342017,
+            "epochs": 140,
+            "n_layers": 5,
+            "layer_size": 16,
+            "batch_size": 1536
+        },
+        "best_nll": 2.303469625344701
+    },
+    "Pol_OpenML_MVE_Ensemble_Averaged_MVE_Default_tp100.0": {
+        "dataset": "Pol_OpenML",
+        "wrapper": "MVE_Ensemble_Averaged",
+        "model": "MVE_Default",
+        "train_percent": 100.0,
+        "hyperparameters": {
+            "lr": 0.0004818183409707339,
+            "epochs": 180,
+            "n_layers": 4,
+            "layer_size": 72,
+            "batch_size": 128
+        },
+        "best_nll": 0.1574038461294766
+    }
+}
