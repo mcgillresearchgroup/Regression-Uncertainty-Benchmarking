@@ -7,9 +7,9 @@ from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
 import torch
 
 # Dictionaries of available datasets, models, and wrappers
-from data_dictionaries import load_dataset, data_pull_dict
-from models_and_wrappers.base_list import base_list_dict
-from models_and_wrappers.model_wrappers import wrapper_list_dict
+from Benchmarking_Results.data_dictionaries import load_dataset, data_pull_dict
+from Benchmarking.models_and_wrappers.base_list import base_list_dict
+from Benchmarking_Results.models_and_wrappers.model_wrappers import wrapper_list_dict
 
 # Available options
 DATASETS = list(data_pull_dict.keys())
@@ -61,7 +61,7 @@ Examples:
     hpo_mode_group.add_argument(
         '--use-best',
         nargs='?',
-        const=None,
+        const='best_params_and_all_results/best_parameters.json',
         type=str,
         help='Use best parameters from previous optimization runs. Optionally specify a custom file path.'
     )
@@ -155,7 +155,7 @@ def negative_log_likelihood(y_true, y_pred_mean, y_pred_var, eps=1e-6):
     return np.mean(nll)
 
 # Add in the saving of the params used in the save results function, so that we can easily track which hyperparameters were used for each result file.
-def save_results(results_dir, dataset_name, wrapper_name, base_name, mean_pred, var_pred, y_test, hyperparameters=None, train_percent=None):
+def save_results(results_dir, dataset_name, wrapper_name, base_name, mean_pred, var_pred, y_test, hyperparameters=None, train_percent=None, fold_id=None):
     """Save model predictions and metrics to file."""
     results_dir = Path(results_dir)
     results_dir.mkdir(exist_ok=True)
@@ -171,6 +171,7 @@ def save_results(results_dir, dataset_name, wrapper_name, base_name, mean_pred, 
     var_list = var_pred.flatten().tolist()
     y_true_array = np.asarray(y_test).flatten()
     y_true_list = y_true_array.tolist()
+    fold_id_list = np.asarray(fold_id).flatten().tolist() if fold_id is not None else None
     # Create filename. train_percent is included so results from a train_percent sweep are
     # identifiable and sortable from the filename alone, without opening every JSON file.
     timestamp = pd.Timestamp.now().strftime('%Y%m%d_%H%M%S')
@@ -196,7 +197,8 @@ def save_results(results_dir, dataset_name, wrapper_name, base_name, mean_pred, 
         'accuracy': {
             'mean': mean_list,
             'variance': var_list,
-            'ground_truth': y_true_list
+            'ground_truth': y_true_list,
+            'fold_id': fold_id_list
         }
     }
     

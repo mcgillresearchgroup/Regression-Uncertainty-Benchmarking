@@ -150,7 +150,7 @@ def run_job(job_index):
         "-w", wrapper,
         "--seed", str(seed),
         "--train-percent", str(train_percent),
-        "--use-best",
+        "--use-best", "best_params_and_all_results/best_parameters.json",
     ]
 
     result = subprocess.run(cmd)
