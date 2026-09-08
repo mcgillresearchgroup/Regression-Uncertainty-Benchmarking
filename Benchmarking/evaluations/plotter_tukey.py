@@ -48,35 +48,6 @@ def build_index(results_dir=None):
 
             fname = file_path.name
 
-            # Extract trainpercent from ..._tp20.0_... pattern
-            m_tp = re.search(r"_tp(?P<tp>[\d.]+)_", fname)
-            if m_tp and train_percent is None:
-                train_percent = float(m_tp.group("tp"))
-
-            # Extract dataset = first chunk before first underscore
-            if dataset is None:
-                dataset = fname.split("_", 1)[0]
-
-            # Extract wrapper from JSON if missing; otherwise infer from filename
-            if wrapper is None:
-                if "GP_Wrapper" in fname:
-                    wrapper = "GP_Wrapper"
-                elif "MVE_Ensemble_Averaged" in fname:
-                    wrapper = "MVE_Ensemble_Averaged"
-
-            # Extract model more loosely: the chunk(s) after wrapper and before _tp
-            if base is None:
-                # Remove dataset_
-                rest = fname[len(dataset) + 1:]
-                # rest starts with wrapper_..., find _tp
-                tp_pos = rest.find("_tp")
-                before_tp = rest[:tp_pos] if tp_pos != -1 else rest
-                # remove wrapper_ prefix
-                if wrapper and before_tp.startswith(wrapper + "_"):
-                    base = before_tp[len(wrapper) + 1:]
-                else:
-                    base = before_tp
-
             if dataset is None:
                 print(f"[index] Skipping {file_path.name}: dataset is None")
                 continue

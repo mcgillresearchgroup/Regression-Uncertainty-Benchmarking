@@ -551,6 +551,132 @@ class GP_Wrapper(Default_Wrapper):
         }
 
 
+class MVE_Warmup_Phase(Default_Wrapper):
+    """Wrapper for MVE with a warmup phase of 10% of epochs for the mean head only, then the full model for the remaining epochs."""
+
+    def training(self, X_tensor, y_tensor):
+        """Train models with optional mini-batch support and a warmup phase.
+        During warmup (first 10% of epochs), only the mean head is trained using MSE loss,
+        regardless of whether variance is output. After warmup, if log(variance) is present,
+        training switches to GaussianNLLLoss; otherwise it continues with MSE loss.
+        Inputs:
+            X_tensor: Scaled input features as a PyTorch tensor
+            y_tensor: Scaled target values as a PyTorch tensor
+        Returns:
+            self.model_set: List of trained model instances"""
+
+        self.create_models()
+        n_samples = X_tensor.shape[0]
+        batch_size = self.batch_size if self.batch_size is not None else n_samples
+
+        # Number of warmup epochs (mean-only training)
+        warmup_epochs = int(0.1 * self.epochs) if self.output_variance else 0
+
+        # Train each model in the ensemble
+        for model_idx, model in enumerate(self.model_set):
+            model.train()
+            optimizer = torch.optim.Adam(model.parameters(), lr=self.lr)
+            criterion = torch.nn.GaussianNLLLoss()
+            rmse_loss_list = []
+            training_early_stopped = False
+
+            for epoch in range(self.epochs):
+                is_warmup = epoch < warmup_epochs
+
+                # Mini-batch training
+                rmse_epoch_loss = 0.0
+                for batch_start in range(0, n_samples, batch_size):
+                    batch_end = min(batch_start + batch_size, n_samples)
+                    X_batch = X_tensor[batch_start:batch_end]
+                    y_batch = y_tensor[batch_start:batch_end]
+
+                    output = model(X_batch)
+
+                    if self.output_variance:
+                        mean_pred, log_var_pred = output
+                        if is_warmup:
+                            # Warmup: train only the mean head with MSE loss.
+                            # log_var_pred is excluded from the loss so the variance
+                            # head receives no gradient signal during this phase.
+                            loss = torch.nn.functional.mse_loss(mean_pred.flatten(), y_batch.flatten())
+                        else:
+                            var_pred = torch.exp(log_var_pred)
+                            loss = criterion(mean_pred.flatten(), y_batch.flatten(), var_pred.flatten())
+                    else:
+                        mean_pred = output
+                        loss = torch.nn.functional.mse_loss(mean_pred.flatten(), y_batch.flatten())
+
+                    optimizer.zero_grad()
+                    loss.backward()
+                    optimizer.step()
+                    rmse_epoch_loss += torch.nn.functional.mse_loss(mean_pred.flatten(), y_batch.flatten()).item() * (batch_end - batch_start)
+
+                phase_label = "Warmup" if is_warmup else "Full"
+                print(f"Model {model_idx + 1}/{self.n_models}, Epoch {epoch + 1}/{self.epochs} [{phase_label}], RMSE Loss: {rmse_epoch_loss/n_samples:.4f}")
+
+                # Early stopping here
+
+            # Move model to CPU after training to free GPU memory
+            model.cpu()
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+            gc.collect()
+
+    def predict(self, X):
+            X = np.asarray(X, dtype=np.float32)
+            data_check(X=X)
+            
+            X_scaled = self.x_scaler.transform(X)
+            X_tensor = torch.from_numpy(X_scaled).float()
+            
+            preds_mean_list = []
+            preds_var_list = []
+            
+            for model in self.model_set:
+                model.eval()
+                model = model.to(self.device)
+                X_batch = X_tensor.to(self.device)
+                with torch.no_grad():
+                    mean, log_var = model(X_batch)
+                    var = torch.exp(log_var)
+                    preds_mean_list.append(mean.cpu().numpy())
+                    preds_var_list.append(var.cpu().numpy())
+                model.cpu()
+            
+            # Memory-efficient stacking and processing
+            preds_mean = np.stack(preds_mean_list, axis=0)  # (n_models, n_samples, n_targets)
+            preds_var = np.stack(preds_var_list, axis=0)
+            del preds_mean_list, preds_var_list
+            gc.collect()
+            
+            n_models, n_samples, n_targets = preds_mean.shape
+            
+            # Reshape for inverse_transform
+            preds_mean_reshaped = preds_mean.reshape(-1, n_targets)
+            preds_var_reshaped = preds_var.reshape(-1, n_targets)
+            
+            # Inverse transform
+            preds_mean_unscaled = self.y_scaler.inverse_transform(preds_mean_reshaped)
+            preds_var_unscaled = preds_var_reshaped * (self.y_scaler.scale_ ** 2)
+            
+            # Reshape back
+            preds_mean_unscaled = preds_mean_unscaled.reshape(n_models, n_samples, n_targets)
+            preds_var_unscaled = preds_var_unscaled.reshape(n_models, n_samples, n_targets)
+            
+            # Ensemble aggregation
+            mean_ensemble = preds_mean_unscaled.mean(axis=0)
+            aleatoric_var = preds_var_unscaled.mean(axis=0)
+            epistemic_var = preds_mean_unscaled.var(axis=0)
+            if n_models == 1:
+                var_ensemble = aleatoric_var
+            else:
+                var_ensemble = aleatoric_var + epistemic_var
+            return mean_ensemble, var_ensemble
+
+    
+        
+    
+
 wrapper_list_dict = {
     'MVE_Ensemble_Averaged': [MVE_Ensemble_Averaged, True],
     'MLP_Ensemble': [MLP_Ensemble, False],
